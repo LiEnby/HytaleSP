@@ -16,7 +16,6 @@ import (
 )
 
 var HOME_FOLDER, _ = os.UserHomeDir();
-
 var MAIN_FOLDER = path.Join(HOME_FOLDER, "hytLauncher");
 var GAME_FOLDER = path.Join(MAIN_FOLDER, "game", "versions");
 var USERDATA_FOLDER = path.Join(MAIN_FOLDER, "userdata");
@@ -123,6 +122,10 @@ func installGame(version int, channel string) any {
 
 			if _, ok := pwr.(string); ok {
 				applyPatch(unpack, unpack, save);
+
+				// delete pwr file ..
+				os.Remove(save);
+				// delete download folder
 				os.RemoveAll(path.Dir(save));
 				return unpack;
 			}
@@ -174,13 +177,19 @@ func launchGame(version int, channel, username string, uuid string) {
 				"--java-exec",
 				javaBin,
 				"--auth-mode",
-				"offline",
+				"authenticated",
 				"--uuid",
 				uuid,
 				"--name",
-				username);
+				username,
+				"--identity-token",
+				generateIdentityJwt(),
+				"--session-token",
+				generateSessionJwt());
 
 		e.Start();
+
+		runServer(username, uuid);
 
 	}
 
