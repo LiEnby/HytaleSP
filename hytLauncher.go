@@ -172,6 +172,16 @@ func installGame(version int, channel string, progress func(done int64, total in
 
 	if !isGameVersionInstalled(version, channel) {
 		downloadUrl := guessPatchUrlNoAuth(runtime.GOARCH, runtime.GOOS, channel, closestVersion, version);
+
+		// check if this patch exists, if not fallback on the 0 patch.
+		req, err := http.Head(downloadUrl);
+		if err != nil {
+			panic("Failed to download version");
+		}
+		if req.StatusCode != 200 {
+			downloadUrl = guessPatchUrlNoAuth(runtime.GOARCH, runtime.GOOS, channel, 0, version);
+		}
+
 		pwr := download(downloadUrl, save, progress);
 		os.MkdirAll(unpack, 0775);
 
@@ -179,7 +189,7 @@ func installGame(version int, channel string, progress func(done int64, total in
 			applyPatch(srcPath, unpack, save);
 
 			os.Remove(save);
-			os.RemoveAll(filepath.Dir(save));
+			os.RemoveAll(getVersionDownloadsFolder());
 			return unpack;
 		} else {
 			panic("Failed to download version");

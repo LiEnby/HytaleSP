@@ -376,9 +376,7 @@ func main() {
 	os.MkdirAll(ServerDataFolder(), 0775);
 	readSettings();
 	os.MkdirAll(GameFolder(), 0775);
-
-	// remove temporary files
-	go os.RemoveAll(getVersionDownloadsFolder());
+;
 
 	err := loop.Run(createWindow)
 	if err != nil {
