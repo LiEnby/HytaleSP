@@ -1,18 +1,22 @@
 package main
 
 import (
+	"embed"
+	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
 	"path"
-	"runtime"
-	"strings"
-	"strconv"
-	"os"
-	"fmt"
 	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
 )
 
+
+//go:embed Aurora/Build/Aurora.dll
+var emb embed.FS
 
 func urlToPath(targetUrl string) string {
 	nurl, _ := url.Parse(targetUrl);
@@ -240,47 +244,73 @@ func launchGame(version int, channel string, username string, uuid string) {
 	userDir := UserDataFolder()
 	clientBinary := findClientBinary(version, channel);
 
-	go runServer();
 
-	if runtime.GOOS == "windows" {
+	if wCommune.Mode == "fakeonline" {
+
+		go runServer();
+
+		// write fakeonline dll
+		if runtime.GOOS == "windows" {
+			dllName := filepath.Join(filepath.Dir(clientBinary), "Secur32.dll");
+			data, err := emb.ReadFile("Aurora/Build/Aurora.dll");
+			if err != nil {
+				fmt.Printf("Failied to read aurora.dll %s\n", err);
+				panic("failed to read aurora dll");
+			}
+			os.WriteFile(dllName, data, 0777);
+			defer os.Remove(dllName);
+
+		} else {
+			panic("fakeonline not supported on your platform.");
+		}
+
+
 		e := exec.Command(clientBinary,
-				  "--app-dir",
-		    appDir,
-		    "--user-dir",
-		    userDir,
-		    "--java-exec",
-		    javaBin,
-		    "--auth-mode",
-		    "authenticated",
-		    "--uuid",
-		    uuid,
-		    "--name",
-		    username,
-		    "--identity-token",
-		    generateIdentityJwt("hytale:client"),
-		    "--session-token",
-		    generateSessionJwt("hytale:client"));
+			"--app-dir",
+			appDir,
+			"--user-dir",
+			userDir,
+			"--java-exec",
+			javaBin,
+			"--auth-mode",
+			"authenticated",
+			"--uuid",
+			uuid,
+			"--name",
+			username,
+			"--identity-token",
+			generateIdentityJwt("hytale:client"),
+			"--session-token",
+			generateSessionJwt("hytale:client"));
 
 		fmt.Printf("Running: %s %s\n", clientBinary, strings.Join(e.Args, " "))
 
 		e.Start();
+		e.Process.Wait();
+
 	} else { // start in offline mode
+
+		// remove fakeonline patch if present.
+		dllName := filepath.Join(filepath.Dir(clientBinary), "Secur32.dll");
+		os.Remove(dllName);
+
 		e := exec.Command(clientBinary,
-				  "--app-dir",
-		    appDir,
-		    "--user-dir",
-		    userDir,
-		    "--java-exec",
-		    javaBin,
-		    "--auth-mode",
-		    "offline",
-		    "--uuid",
-		    uuid,
-		    "--name",
-		    username);
+			"--app-dir",
+			appDir,
+			"--user-dir",
+			userDir,
+			"--java-exec",
+			javaBin,
+			"--auth-mode",
+			"offline",
+			"--uuid",
+			uuid,
+			"--name",
+			username);
 
 		fmt.Printf("Running: %s %s\n", clientBinary, strings.Join(e.Args, " "))
 
 		e.Start();
+		e.Process.Wait();
 	}
 }

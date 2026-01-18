@@ -23,6 +23,7 @@ type launcherCommune struct {
 	SelectedVersion int `json:"last_version"`
 	LatestVersions map[string]int `json:"last_version_scan_result"`
 	GameFolder string `json:"install_directory"`
+	Mode string `json:"mode"`
 }
 
 
@@ -37,6 +38,7 @@ var(
 		},
 		SelectedVersion: 4,
 		GameFolder: DefaultGameFolder(),
+		Mode: "fakeonline",
 	};
 	wProgress = 0
 	wDisabled = false
@@ -247,6 +249,7 @@ func installLocation() base.Widget {
 						&goey.Expand{
 							Child: &goey.TextInput{
 								Placeholder: "Install Location",
+								Disabled: wDisabled,
 								Value: wCommune.GameFolder,
 								OnChange: func(v string) {
 									wCommune.GameFolder = v;
@@ -256,6 +259,7 @@ func installLocation() base.Widget {
 						},
 						&goey.Button{
 							Text: "Browse",
+							Disabled: wDisabled,
 							OnClick: func() {
 								dir, err := dialog.Directory().Title("Select install location").Browse();
 								if err != nil {
@@ -275,6 +279,38 @@ func installLocation() base.Widget {
 	};
 }
 
+func modeSelector () base.Widget {
+	var v int;
+	if wCommune.Mode == "fakeonline" {
+		v = 1;
+	} else {
+		v = 0;
+	}
+
+	return &goey.VBox {
+		AlignMain: goey.SpaceBetween,
+		Children: []base.Widget{
+			&goey.Label{Text: "Launch Mode:"},
+			&goey.SelectInput{
+				Items: []string {
+					"Offline Mode",
+					"Fake Online Mode",
+					//"Authenticated",
+				},
+				Value: v,
+				Disabled: wDisabled,
+				OnChange: func(v int) {
+					if v == 1{
+						wCommune.Mode = "fakeonline";
+					} else {
+						wCommune.Mode = "offline";
+					}
+				},
+			},
+		},
+	}
+}
+
 func usernameBox() base.Widget {
 	return &goey.VBox{
 		AlignMain: goey.SpaceBetween,
@@ -291,6 +327,7 @@ func usernameBox() base.Widget {
 		},
 	};
 }
+
 
 func updateProgress(done int64, total int64) {
 	lastProgress := wProgress;
@@ -360,6 +397,7 @@ func renderWindow() base.Widget {
 						},
 					},
 					installLocation(),
+					modeSelector(),
 				},
 			},
 		},

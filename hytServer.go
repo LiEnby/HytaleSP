@@ -199,9 +199,6 @@ func handleMyAccountLauncherData(w http.ResponseWriter, req *http.Request) {
 
 func handleSessionChild(w http.ResponseWriter, req *http.Request) {
 
-	w.WriteHeader(404);
-
-	/*
 	session := sessionNew{
 		ExpiresAt: time.Now().Add(time.Hour*10),
 		IdentityToken: generateIdentityJwt("hytale:server"),
@@ -210,9 +207,18 @@ func handleSessionChild(w http.ResponseWriter, req *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json");
 	w.WriteHeader(200);
-	json.NewEncoder(w).Encode(session);*/
+	json.NewEncoder(w).Encode(session);
 
 }
+
+func handleBugReport(w http.ResponseWriter, req *http.Request) {
+	w.WriteHeader(204);
+}
+
+func handleFeedbacksReport(w http.ResponseWriter, req *http.Request) {
+	w.WriteHeader(204);
+}
+
 func handleManifest(w http.ResponseWriter, req *http.Request) {
 
 	target := req.PathValue("target")
@@ -241,6 +247,7 @@ func handlePatches(w http.ResponseWriter, req *http.Request) {
 }
 
 
+
 func runServer() {
 
 	mux := http.NewServeMux()
@@ -256,14 +263,15 @@ func runServer() {
 	// session.hytale.com
 	mux.HandleFunc("/game-session/child", handleSessionChild);
 
+	// tools.hytale.com
+	mux.HandleFunc("/bugs/create", handleBugReport);
+	mux.HandleFunc("/feedback/create", handleFeedbacksReport);
+
+
 	var handler  http.Handler = mux
 	handler = logRequestHandler(handler)
 
-	err := http.ListenAndServe("127.0.0.1:8080", handler)
-	if err != nil {
-		fmt.Printf("Failed to listen error=%s\n", err)
-		os.Exit(1)
-	}
+	http.ListenAndServe("127.0.0.1:59313", handler)
 }
 
 
