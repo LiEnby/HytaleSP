@@ -2,3 +2,5 @@ Build/*
 *.user
 *.users
 *.vs/*
+*.dll
+*.so
