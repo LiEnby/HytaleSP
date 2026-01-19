@@ -313,16 +313,21 @@ func launchGame(version int, channel string, username string, uuid string) {
 			"--session-token",
 			generateSessionJwt("hytale:client"));
 
-		fmt.Printf("Running: %s %s\n", clientBinary, strings.Join(e.Args, " "))
-		fmt.Printf("DllName: %s\n", dllName);
+		fmt.Printf("LD_PRELOAD=%s\n", dllName);
 
 		if runtime.GOOS == "linux" {
 			os.Setenv("LD_PRELOAD", dllName);
 		}
 
+		fmt.Printf("Running: %s\n", strings.Join(e.Args, " "))
+
 		err = e.Start();
 		if err != nil {
 			wMainWin.Message(fmt.Sprintf("Failed to start %s", err)).WithError().WithTitle("Failed to start").Show();
+		}
+
+		if runtime.GOOS == "linux" {
+			os.Unsetenv("LD_PRELOAD");
 		}
 
 		defer e.Process.Kill();

@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <assert.h>
 #include <stddef.h>
 #include <sys/mman.h>
@@ -138,10 +139,45 @@ void overwrite(csString* dst, csString* src) {
 
 	b = get_change_prot((uintptr_t)dst, prev);
 
-
 }
 
+
+void allowOfflineInOnline(uint8_t* src) {
+
+    // linux:  48 8D ?? ?? E8 ?? ?? ?? 00 80 ?? ?? 00 0F 84
+    // windows: 48 8D ?? ?? ?? E8 ?? ?? ?? ?? 80 ?? ?? ?? 00 0F 84
+
+
+    if (src[0] == 0x48 &&
+				src[1] == 0x8D &&
+				src[4] == 0xE8 &&
+				src[8] == 0x00 &&
+				src[9] == 0x80 &&
+				src[12] == 0x00 &&
+				src[13] == 0x0F &&
+				src[14] == 0x84) {
+
+				printf("Found debug check @ %p\n", src);
+
+				void* target = &src[13];
+
+				int prev = get_prot(target);
+				int b = get_change_prot((uintptr_t)target, PROT_READ | PROT_WRITE);
+				if(b == 0){
+					memset(target, 0x90, 0x6);
+				} else {
+					printf("Failed to change memory protections %s\n", strerror(errno));
+				}
+				b = get_change_prot((uintptr_t)target, prev);
+
+    }
+
+
+}
 __attribute__((constructor)) int run() {
+	// cleanup after ourselves.
+	unsetenv("LD_PRELOAD");
+
 	printf("Trans rights!\n");
 
 	modinfo inf = get_base();
@@ -149,7 +185,8 @@ __attribute__((constructor)) int run() {
 	uint8_t* memory = inf.start;
 
 	for(size_t i = 0; i < inf.sz; i++) {
-
+		// allow online mode in offline mode.
+		allowOfflineInOnline(&memory[i]);
 
 		// replace url prefixes to http ..
 		swap(&memory[i], L"https://account-data.", L"http://127.0.0");
