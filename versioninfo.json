@@ -2,13 +2,13 @@
     "FixedFileInfo": {
         "FileVersion": {
             "Major": 1,
-            "Minor": 5,
+            "Minor": 6,
             "Patch": 0,
             "Build": 0
         },
         "ProductVersion": {
             "Major": 1,
-            "Minor": 5,
+            "Minor": 6,
             "Patch": 0,
             "Build": 0
         },
@@ -22,14 +22,14 @@
         "Comments": "",
         "CompanyName": "Hypixel Studios",
         "FileDescription": "HytaleSP",
-        "FileVersion": "v0.5.0.0",
+        "FileVersion": "v0.6.0.0",
         "InternalName": "Hypixel Studios",
         "LegalCopyright": "Hypixel Studios",
         "LegalTrademarks": "Hypixel Studios",
         "OriginalFilename": "HytaleSP.exe",
         "PrivateBuild": "",
         "ProductName": "HytaleSP",
-        "ProductVersion": "v0.5.0.0",
+        "ProductVersion": "v0.6.0.0",
         "SpecialBuild": ""
     },
     "VarFileInfo": {
