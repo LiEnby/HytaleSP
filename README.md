@@ -57,3 +57,9 @@ i also want to add "premium" support as well-
 mm the code for authentication flow is actually already here ..
 
 but i wont remove the 'offline' or 'fakeonline' options for those who need them though .. 
+
+# Screenshots 
+
+![hytLauncher ui itself](https://git.silica.codes/Li/hytLauncher/raw/branch/main/images/screenshot1.png)
+![skin selection screen](https://git.silica.codes/Li/hytLauncher/raw/branch/main/images/screenshot2.png)
+
