@@ -1,14 +1,20 @@
+#HytaleSP
+
 An alternative launcher for "Hytale" with a fairly streightforward "native" UI
  features:
  
  - Multiple version management
- - Run offline without needing a hytale account.
- - Universal "fake online" or "online fix" for all versions;
+ - Incremental patch from one version to another
+ - Universal "online fix" or that works on all versions;
  - Access all "Supporter" and "Cursebreaker" cosmetic items.
  - Play local or online multiplayer
+ - Completely standalone no butler or other external tools
+ - Fairly transparent online patch implementation.
+ - Run offline and download without needing a hytale account.
+ - Supports Windows 7+
+ 
+Currently for: Windows and Linux (i would do MacOS, but i dont have access to an ARM Mac right now.)
 
-Currently for: Windows and Linux
-(i need access to an ARM mac to make a mac os version) 
 
 NOTE: you can even probably play online, but only if the servers your joining have ``--auth-mode=insecure`` set in the command line;
 enabling this option would also mean anyone using the offical launcher cannot play 
@@ -47,14 +53,20 @@ after that you can use ``go build .``
 or you can use ``build-linux.sh``
 
 # Alternative names
+Originally, i called it "hytLauncher", being a play on "TLauncher" for minecraft;
+however i found that, alot of other alternative hytale launchers had a simular name, (eg HyTaLauncher, HyLauncher, etc.)
 
-'hytLauncher may not be the final name for this project ..'
+furthermore tLauncher is a bit sketchy in general and there are better options for minecraft too;
+for now i have settled on "HytaleSP" .. a reference to an extremely OG minecraft launcher;
+
+i may consider other names in the future;
+
 other names i considered using :
 
 - hyTLauncher
 - HytaleSP
-- AnjoCaido's Hytale Launcher
-- HytaleForFree.com
+- AnjoCaidos Hytale Launcher
+- HytaleForFree.com 
 
 in all seriousness i kind of would want something a bit original xS
 also this is not nessecarily planned to be a purely 'offline mode' launcher; 
@@ -66,6 +78,6 @@ but i wont remove the 'offline' or 'fakeonline' options for those who need them 
 
 # Screenshots 
 
-![hytLauncher ui itself](https://git.silica.codes/Li/hytLauncher/raw/branch/main/images/screenshot1.png)
-![skin selection screen](https://git.silica.codes/Li/hytLauncher/raw/branch/main/images/screenshot2.png)
+![hytLauncher ui itself](https://git.silica.codes/Li/HytaleSP/raw/branch/main/images/screenshot1.png)
+![skin selection screen](https://git.silica.codes/Li/HytaleSP/raw/branch/main/images/screenshot2.png)
 
