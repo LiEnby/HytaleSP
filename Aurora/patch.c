@@ -32,8 +32,6 @@ void overwrite(csString* old, csString* new) {
 
 void allowOfflineInOnline(uint8_t* mem) {
     if (PATTERN_PLATFORM) {
-
-
         int prev = get_prot(mem);        
         // the is online mode and is singleplayer checks
         // are almost right next to eachother, it checks one, then checks the other
@@ -90,13 +88,26 @@ void changeServers() {
         
         // pre release 10 onwards actually verifies the token you provide here if one is provided
         // but it also validates that you have set valid arguments and will fail if its invalid
-        // so im setting this to an argument that doesn't do anything useful (disabling sentry telemetry thingy) 
-        {.old = make_csstr(L"--session-token=\""),    .new = make_csstr(L"--disable-sentry=\"")},
-        {.old = make_csstr(L"--identity-token=\""),   .new = make_csstr(L"--disable-sentry=\"")},
+        // so im setting this to --singleplayer, it is always set on singleplayer worlds
+        // and takes no arguments (so the token will just be discarded ..) 
+        // .. enabling it again will therefore do absolutely nothing ..
+        {.old = make_csstr(L"--session-token=\""),    .new = make_csstr(L"--singleplayer=\"")},
+        {.old = make_csstr(L"--identity-token=\""),   .new = make_csstr(L"--singleplayer=\"")},
     };
 
+
     int totalSwaps = (sizeof(swaps) / sizeof(swapEntry));
-    
+
+#ifdef _DEBUG
+    // sanity check :
+    // 
+    // make sure our swaps are always smaller than or the same size as, the original string
+    // you can get away with this not being the case on windows as theres extra space, but not on Linux or Mac!
+    for (int i = 0; i < totalSwaps; i++) {
+        assert(get_size(swaps[i].new) <= get_size(swaps[i].old));
+    }
+#endif
+
     modinfo modinf = get_base();
     uint8_t* memory = modinf.start;
 
