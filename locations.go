@@ -12,7 +12,14 @@ import (
 var LAUNCHER_NAME = "hytLauncher";
 
 func MainFolder() string {
-
+	// look for explicit override of the main folder
+	hytSpDir, valid := os.LookupEnv("HYTALESP_DIR");
+	if valid == true {
+		stat, err := os.Stat(hytSpDir);
+		if err == nil && stat.IsDir() {
+			return hytSpDir;
+		}
+	}
 
 	// also check inside the same folder as the executable.
 	exe, err := os.Executable();
@@ -20,10 +27,8 @@ func MainFolder() string {
 		portable := filepath.Join(filepath.Dir(exe), LAUNCHER_NAME);
 		stat, err := os.Stat(portable);
 
-		if err == nil {
-			if stat.IsDir() {
-				return portable;
-			}
+		if err == nil && stat.IsDir() {
+			return portable;
 		}
 	}
 
@@ -35,6 +40,7 @@ func MainFolder() string {
 	}
 	oldFolder := filepath.Join(home, LAUNCHER_NAME);
 
+
 	// if not found then use the new "app data" directory;
 	_, err = os.Stat(oldFolder);
 	if err != nil {
@@ -42,9 +48,20 @@ func MainFolder() string {
 			case "windows":
 				appdata, valid := os.LookupEnv("APPDATA");
 				if valid == true {
-					return filepath.Join(appdata, LAUNCHER_NAME);
+					stat, err := os.Stat(appdata);
+					if err == nil && stat.IsDir() {
+						return filepath.Join(appdata, LAUNCHER_NAME);
+					}
 				}
+				return oldFolder;
 			case "linux":
+				config, valid := os.LookupEnv("XDG_CONFIG_HOME");
+				if valid == true {
+					stat, err := os.Stat(config);
+					if err == nil && stat.IsDir() {
+						return filepath.Join(config, LAUNCHER_NAME);
+					}
+				}
 				return filepath.Join(home, ".config", LAUNCHER_NAME);
 			case "darwin":
 				return filepath.Join(home, "Library", LAUNCHER_NAME);
