@@ -1,7 +1,7 @@
 [Desktop Entry]
 Categories=Game;Java
 Exec=HytaleSP
-Icon=com.hytale.hytaleSP
+Icon=trans.hytaleSP.hytaleSP
 Name=HytaleSP
 Terminal=false
 Type=Application

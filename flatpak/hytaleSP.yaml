@@ -1,0 +1,35 @@
+app-id: trans.hytaleSP.hytaleSP
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+command: HytaleSP
+
+finish-args:
+- --socket=pulseaudio
+- --socket=fallback-x11
+- --socket=wayland
+- --share=network
+- --device=dri
+- --share=ipc
+- --persist=hytLauncher
+
+modules:
+- name: HytaleSP
+  buildsystem: simple
+  build-commands:
+  - mkdir -p /app/lib
+  - ln -s /usr/lib/x86_64-linux-gnu/libSDL3_image.so.0 /app/lib/SDL3_image.so
+  - ln -s /usr/lib/x86_64-linux-gnu/libpng16.so.16 /app/lib/libpng16.so
+  - install -Dm755 HytaleSP -t /app/bin
+  - install -D trans.hytaleSP.hytaleSP.desktop -t /app/share/applications/
+  - install -D trans.hytaleSP.hytaleSP.metainfo.xml -t /app/share/metainfo
+  - install -D trans.hytaleSP.hytaleSP.png -t /app/share/icons/hicolor/256x256/apps/
+  sources:
+  - type: file # Exec
+    path: ../HytaleSP
+  - type: file # metadata created with jdAppstreamEditor
+    path: trans.hytaleSP.hytaleSP.metainfo.xml
+  - type: file # desktop file
+    path: trans.hytaleSP.hytaleSP.desktop
+  - type: file # temporary icon lol
+    path: trans.hytaleSP.hytaleSP.png

@@ -1,13 +1,13 @@
 <?xml version='1.0' encoding='utf-8'?>
 <component type="desktop-application">
-  <id>com.hytale.hytaleSP</id>
+  <!--Created with jdAppStreamEdit 9.2-->
+  <id>trans.hytaleSP.hytaleSP</id>
   <name>HytaleSP</name>
   <summary>Custom "free" Hytale Launcher // w .. downgrading, offline mode, fake online etc..</summary>
-  <developer id="com.hytale">
+  <developer id="trans.hytaleSP.hytaleSP">
     <name>Hypixel</name>
   </developer>
-  <metadata_license>OQL-1.3</metadata_license>
-  <project_license>OQL-1.3</project_license>
+  <metadata_license>FSFAP</metadata_license>
   <description>
     <p>An alternative launcher for "Hytale" with a fairly streightforward "native" UI features:</p>
     <ul>
@@ -43,13 +43,5 @@
     <content_attribute id="violence-cartoon">moderate</content_attribute>
     <content_attribute id="violence-fantasy">moderate</content_attribute>
   </content_rating>
-  <launchable type="desktop-id">com.hytale.hytaleSP.desktop</launchable>
-  <!-- ignore this, its just to get the damn thing to build
-  flatpak builder only allow it to build if this is set to one of 10 permissive 'approved' licenses.
-  .. Licenses are bullshit excuses to treat people poorly anyway; treat it less like a legal threat 
-  and more like a 'please dont use my shit to cause further harm to people, trans rights'
-  .. just like all other laws are just an excuse to  do dehumanization and cause immense harm on purpose, 
-  and as such they should called out for what they are. -->
-  <metadata_license ignore="true">CC0-1.0</metadata_license>
+  <launchable type="desktop-id">trans.hytaleSP.hytaleSP.desktop</launchable>
 </component>
-
