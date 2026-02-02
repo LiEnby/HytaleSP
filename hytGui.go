@@ -69,6 +69,7 @@ var (
 	wProgress float32 = 0.0
 	wDisabled = false
 	wSelectedTab = 0
+	wGameRunning = false
 	wInstalledVersions map[string]map[int]bool = map[string]map[int]bool{
 		"release" : map[int]bool{},
 		"pre-release" : map[int]bool{},
@@ -281,6 +282,7 @@ func startGame() {
 	// enable the window again once done
 	defer func() {
 		wDisabled = false;
+		wGameRunning = false;
 	}();
 
 	ver := int(wCommune.SelectedVersion+1);
@@ -304,6 +306,8 @@ func startGame() {
 		wInstalledVersions[channel][ver] = true;
 	}
 
+	// set game running flag
+	wGameRunning = true;
 	err = launchGame(ver, channel, wCommune.Username, getUUID());
 
 	if err != nil {
@@ -566,13 +570,16 @@ func drawWidgets() {
 			giu.TabItem("Settings").Layout(
 				drawSettings(),
 			),
+			giu.TabItem("Mods").Layout(
+				giu.Custom(func(){}),
+			),
 		),
 	)
 }
 
 func createWindow() error {
 
-	wMainWin = giu.NewMasterWindow("HytaleSP", 800, 400, 0);
+	wMainWin = giu.NewMasterWindow("HytaleSP", 800, 360, 0);
 	if wMainWin == nil {
 		return fmt.Errorf("result from NewMasterWindow was nil");
 	}
@@ -581,7 +588,19 @@ func createWindow() error {
 	io.SetConfigFlags(io.ConfigFlags() & ^imgui.ConfigFlagsViewportsEnable);
 
 	wMainWin.SetCloseCallback(func() bool {
-		writeSettings();
+		defer writeSettings();
+
+		// warn about closing hytale while the auth server emulator is still running.
+		if wGameRunning && wCommune.Mode == E_MODE_FAKEONLINE {
+			dlg := dialog.Message("WAIT! Hytale is still running!!!\nso .. if you close HytaleSP now-\nThe game will report \"Session Expired\" and revert to \"Offline Mode\"\nand as such; you will not be able to join servers or edit your avatar\nuntil the game is restarted ..\nDo you really want to close HytaleSP ??")
+			dlg.Title("Hytale is still running!");
+			if dlg.YesNo() {
+				return true;
+			} else {
+				return false;
+			}
+		}
+
 		return true;
 	});
 

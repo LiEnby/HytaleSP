@@ -277,6 +277,12 @@ func handleJwksRequest(w http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(w).Encode(keys);
 }
 
+func handleTelemetryRequest(w http.ResponseWriter, req *http.Request) {
+	// send telemetry to /dev/null ..
+	w.WriteHeader(204);
+}
+
+
 func logRequestHandler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("> %s %s\n", r.Method,  r.URL);
@@ -306,6 +312,8 @@ func runServer() {
 	// tools.hytale.com
 	mux.HandleFunc("/bugs/create", handleBugReport);
 	mux.HandleFunc("/feedback/create", handleFeedbacksReport);
+
+	mux.HandleFunc("/telemetry/client", handleTelemetryRequest);
 
 
 	var handler  http.Handler = mux;
