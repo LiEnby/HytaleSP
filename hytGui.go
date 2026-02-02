@@ -52,8 +52,8 @@ var (
 		Patchline: DEFAULT_PATCHLINE,
 		Username: DEFAULT_USERNAME,
 		LatestVersions: map[string]int{
-			"release": 5,
-			"pre-release": 12,
+			"release": 7,
+			"pre-release": 17,
 		},
 		SelectedVersion: 4,
 		Mode: E_MODE_FAKEONLINE,
@@ -140,6 +140,7 @@ func checkForUpdates() {
 		}
 
 		writeSettings();
+		cacheVersionList();
 	}
 }
 
@@ -178,6 +179,7 @@ func authenticatedCheckForUpdatesAndGetProfileList() {
 	wCommune.Profiles = &lData.Profiles;
 
 	writeSettings();
+	cacheVersionList();
 }
 
 func reAuthenticate() {
@@ -425,6 +427,25 @@ func modeSelector () giu.Widget {
 }
 
 
+func drawProfileSelector() giu.Widget {
+	profileList := []string{};
+
+	if wCommune.Profiles != nil {
+		for _, profile := range *wCommune.Profiles {
+			profileList = append(profileList, profile.Username);
+		}
+	}
+
+	profileListTxt := "Not logged in.";
+	if len(profileList) > 0 {
+		profileListTxt = profileList[int(wCommune.SelectedProfile) % len(profileList)];
+	}
+
+	return giu.Style().SetDisabled(wDisabled).To(
+		giu.Label("Select profile"),
+		giu.Combo("##selectProfile", profileListTxt, profileList, &wCommune.SelectedProfile).Size(getWindowWidth()),
+	);
+}
 
 func drawAuthenticatedSettings() giu.Widget {
 
@@ -434,13 +455,6 @@ func drawAuthenticatedSettings() giu.Widget {
 
 	logoutDisabled := wDisabled || (wCommune.AuthTokens == nil);
 	loginDisabled := wDisabled || (wCommune.AuthTokens != nil);
-	profileList := []string{};
-
-	if wCommune.Profiles != nil {
-		for _, profile := range *wCommune.Profiles {
-			profileList = append(profileList, profile.Username);
-		}
-	}
 
 	padX, _ := giu.GetWindowPadding();
 
@@ -450,14 +464,12 @@ func drawAuthenticatedSettings() giu.Widget {
 			giu.Button("Login (OAuth 2.0)").Disabled(loginDisabled).OnClick(func() {
 				go doAuthentication();
 			}).Size((getWindowWidth() / 2) - padX, 0),
-						giu.Button("Logout").Disabled(logoutDisabled).OnClick(func() {
-							wCommune.AuthTokens = nil;
-							wCommune.Profiles = nil;
-							writeSettings();
-						}).Size((getWindowWidth() / 2) - padX, 0),
+			giu.Button("Logout").Disabled(logoutDisabled).OnClick(func() {
+				wCommune.AuthTokens = nil;
+				wCommune.Profiles = nil;
+				writeSettings();
+			}).Size((getWindowWidth() / 2) - padX, 0),
 		),
-		giu.Label("Select profile"),
-		giu.Combo("##selectProfile", profileList[wCommune.SelectedProfile], profileList, &wCommune.SelectedProfile).Size(getWindowWidth()),
 	);
 
 }
@@ -475,36 +487,53 @@ func createDownloadProgress () giu.Widget {
 	w, _ := giu.CalcTextSize(progress);
 	padX, _ := giu.GetWindowPadding();
 
-	return giu.Row(
-		giu.ProgressBar(float32(wProgress)).Size(getWindowWidth() - (w + padX), 0),
-		giu.Label(progress),
-	)
+	return giu.Layout{
+		drawSeperator("Game"),
+		giu.Row(
+			giu.ProgressBar(float32(wProgress)).Size(getWindowWidth() - (w + padX), 0),
+			giu.Label(progress),
+		),
+	}
+}
+
+func drawUserSelection() giu.Widget {
+	if wCommune.Mode == E_MODE_AUTHENTICATED {
+		return drawProfileSelector()
+	} else {
+		return labeledTextInput("Username", &wCommune.Username, wDisabled)
+	}
 }
 
 func drawStartGame() giu.Widget{
+
+	startGameDisabled := (wCommune.Mode == E_MODE_AUTHENTICATED && wCommune.Profiles == nil) || wDisabled
+
 	return &giu.Layout {
 			giu.Style().SetDisabled(wDisabled).To(
-				labeledTextInput("Username", &wCommune.Username, wCommune.Mode == E_MODE_AUTHENTICATED),
+				drawUserSelection(),
 				modeSelector(),
+				// maybe should seperate these two (?) possibly could move mode selector to another folder too
 				patchLineMenu(),
 				versionMenu(),
 			),
 			createDownloadProgress(),
-			giu.Button("Start Game").Disabled(wDisabled).OnClick(func() {
+			giu.Button("Start Game").Disabled(startGameDisabled).OnClick(func() {
 				go startGame();
 			}).Size(getWindowWidth(), 0),
 	}
 }
 
 func drawSettings() giu.Widget{
+
 	return giu.Style().SetDisabled(wDisabled).To(
 		drawSeperator("Directories"),
-		browseButton("Game Location", &wCommune.GameFolder),
-		browseButton("JRE Location", &wCommune.JreFolder),
-		browseButton("UserData Location", &wCommune.UserDataFolder),
-		drawAuthenticatedSettings(),
-		drawSeperator("★Debug Settings"),
-		labeledTextInput("★Override UUID", &wCommune.UUID, wCommune.Mode == E_MODE_AUTHENTICATED),
+		giu.Tooltip("The location that the game files are stored\n(they will be downloaded here, if it's not found)").To(browseButton("Game Location", &wCommune.GameFolder)),
+		giu.Tooltip("The location of the Java Runtime Environment that the game's server uses\n(it will be downloaded here, if it's not found)").To(browseButton("JRE Location", &wCommune.JreFolder)),
+		giu.Tooltip("The location that the games savedata will be stored,\n(worlds, mods, server list, log files, etc)").To(browseButton("User Data Location", &wCommune.UserDataFolder)),
+		giu.Tooltip("These are settings for advanced usecases that are not likely to be needed by most users.\nThe convention of prefixing them with a \"★\" is shamelessly stolen from PlayStation.").To(
+			giu.TreeNode("★Debug Settings").Layout(
+			giu.Tooltip("Allows you to run the game spoofing a specific Universal Unique Identifier (you probably dont need this)").To(labeledTextInput("★Override UUID", &wCommune.UUID, wCommune.Mode == E_MODE_AUTHENTICATED)),
+		)),
 	);
 }
 
@@ -531,6 +560,7 @@ func drawWidgets() {
 		giu.TabBar().TabItems(
 			giu.TabItem("Game").Layout(
 				drawStartGame(),
+				drawAuthenticatedSettings(),
 			),
 			giu.TabItem("Settings").Layout(
 				drawSettings(),
