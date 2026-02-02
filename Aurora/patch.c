@@ -30,8 +30,28 @@ void overwrite(csString* old, csString* new) {
 }
 
 
+void dontSetServerAuthToken(uint8_t* mem) {
+    if (SETAUTH_PATTERN_PLATFORM) {
+        int prev = get_prot(mem);
+        printf("Found set server auth token code at: %p\n", mem);
+
+        if (change_prot((uintptr_t)mem, get_rw_perms()) == 0) {
+
+            for (; (mem[0] != 0x0F || mem[1] != 0x85); mem++); // locate the jne instruction ..
+
+            print("changing jnz to jmp at %p (%02X%02X)\n", mem, mem[0], mem[1]);
+
+            // change to jmp
+            mem[0] = 0x90; // nop
+            mem[1] = 0xE9; // jmp opcode
+        }
+        change_prot((uintptr_t)mem, prev);
+
+    }
+}
+
 void allowOfflineInOnline(uint8_t* mem) {
-    if (PATTERN_PLATFORM) {
+    if (ISDEBUG_PATTERN_PLATFORM) {
         int prev = get_prot(mem);        
         // the is online mode and is singleplayer checks
         // are almost right next to eachother, it checks one, then checks the other
@@ -45,18 +65,20 @@ void allowOfflineInOnline(uint8_t* mem) {
         // mov     rax, [rax+18h]
         // cmp     qword ptr [rax+0B0h], 0
         // jz      loc_7FF7DFEAF93A
-        // .. jz instructions always start with 0F 84 .. ..
+        // .. jae instructions always start with 0F 84 .. ..
         // so we can just scan for that
         // im pretty sure id have to change this approach if i ever wanted to support ARM64 MacOS though ..
         // (or if theres ever a 0F 84 in any of the addresses .. hm but thats a chance of 2^16 :D)
 
         if (change_prot((uintptr_t)mem, get_rw_perms()) == 0) {
-            print("nopping debug check at %p\n", mem);
-            for (; (mem[0] != 0x0F && mem[1] != 0x84); mem++); // locate the jz instruction ...
-            memset(mem, 0x90, 0x6); // fill with NOP
+            printf("Found debug check at: %p\n", mem);
 
+            for (; (mem[0] != 0x0F || mem[1] != 0x84); mem++); // locate the jae instruction ...
+            memset(mem, 0x90, 0x6); // fill with NOP
             print("nopping debug check at %p\n", mem);
-            for (; (mem[0] != 0x0F && mem[1] != 0x84); mem++); // locate the next jz instruction ...
+
+            for (; (mem[0] != 0x0F || mem[1] != 0x84); mem++); // locate the next jae instruction ...
+            print("nopping debug check at %p\n", mem);
             memset(mem, 0x90, 0x6); // fill with NOP
         }
 
@@ -85,14 +107,6 @@ void changeServers() {
         {.old = make_csstr(L"https://tools."),        .new = make_csstr(L"http://127.0.0")},
         {.old = make_csstr(L"hytale.com"),            .new = make_csstr(L".1:59313")},
         {.old = make_csstr(L"authenticated"),         .new = make_csstr(L"insecure")},
-        
-        // pre release 10 onwards actually verifies the token you provide here if one is provided
-        // but it also validates that you have set valid arguments and will fail if its invalid
-        // so im setting this to --singleplayer, it is always set on singleplayer worlds
-        // and takes no arguments (so the token will just be discarded ..) 
-        // .. enabling it again will therefore do absolutely nothing ..
-        {.old = make_csstr(L"--session-token=\""),    .new = make_csstr(L"--singleplayer=\"")},
-        {.old = make_csstr(L"--identity-token=\""),   .new = make_csstr(L"--singleplayer=\"")},
     };
 
 
@@ -114,6 +128,7 @@ void changeServers() {
     for (size_t i = 0; i < modinf.sz; i++) {
         // allow online mode in offline mode.
         allowOfflineInOnline(&memory[i]);
+        dontSetServerAuthToken(&memory[i]);
         
         for (int sw = 0; sw < totalSwaps; sw++) {
             swap(&memory[i], &swaps[sw].old, &swaps[sw].new);
@@ -121,6 +136,7 @@ void changeServers() {
 
         if (num_swaps >= totalSwaps) break;
     }
+
 
 
 }
