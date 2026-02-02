@@ -103,15 +103,15 @@ modinfo get_base() {
 	fclose(fd);
 	return (modinfo) {
 		.start = begin,
-		.sz = end
+			.sz = end
 	};
 #elif _WIN32
 	MODULEINFO info;
 	K32GetModuleInformation(GetCurrentProcess(), GetModuleHandleA(NULL), &info, sizeof(info));
-	
+
 	return (modinfo) {
 		.start = info.lpBaseOfDll,
-		.sz = info.SizeOfImage
+			.sz = info.SizeOfImage
 	};
 #endif
 }
@@ -151,7 +151,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 #ifdef _DEBUG
 		createConsole();
 #endif
-		changeServers();		
+		changeServers();
 		return TRUE;
 	case DLL_THREAD_ATTACH:
 	case DLL_THREAD_DETACH:
