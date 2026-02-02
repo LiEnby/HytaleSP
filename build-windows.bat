@@ -7,10 +7,11 @@ REM msbuild the aurora.dll
 msbuild Aurora\Aurora.slnx /p:Configuration=Release
 
 REM ensure goversioninfo is installed ..
-go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@latest
+REM go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@latest
 
 REM setup application manifest
-go generate
+REM go generate
 
 REM build with subsystem:windows
+windres Resources\res.rc -O coff -o resources.syso
 go build -ldflags="-s -w -H=windowsgui -extldflags=-static"
