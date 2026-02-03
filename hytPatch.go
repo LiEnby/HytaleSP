@@ -8,6 +8,8 @@ import (
 	"github.com/itchio/wharf/pwr"
 	"github.com/itchio/wharf/pwr/bowl"
 	"github.com/itchio/wharf/pwr/patcher"
+	"github.com/itchio/headway/state"
+	"fmt"
 
 	_ "github.com/itchio/wharf/decompressors/cbrotli"
 )
@@ -21,7 +23,13 @@ func applyPatch(source string, destination string, patchFilename string, signatu
 	}
 	defer patchReader.Close();
 
-	p, err := patcher.New(patchReader, nil);
+	consumer := &state.Consumer{
+		OnMessage: func(level string, message string) {
+			fmt.Printf("[%s] %s\n", level, message)
+		},
+	}
+
+	p, err := patcher.New(patchReader, consumer);
 	if err != nil {
 		return err;
 	}
@@ -30,9 +38,9 @@ func applyPatch(source string, destination string, patchFilename string, signatu
 
 	b, err := bowl.NewFreshBowl(bowl.FreshBowlParams{
 		SourceContainer: p.GetSourceContainer(),
-		TargetContainer: p.GetTargetContainer(),
-		TargetPool: targetPool,
-		OutputFolder: destination,
+				    TargetContainer: p.GetTargetContainer(),
+				    TargetPool: targetPool,
+				    OutputFolder: destination,
 	});
 
 	if err != nil {

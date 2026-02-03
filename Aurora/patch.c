@@ -2,7 +2,9 @@
 #include <stdio.h>
 
 #include "shared.h"
+#include "patch.h"
 #include "cs_string.h"
+#include <stdlib.h>
 
 static int num_swaps = 0;
 
@@ -16,10 +18,10 @@ typedef struct swapEntry {
 #else
 #define print(...) /**/
 #endif
-void overwrite(csString* old, csString* new) {    
+void overwrite(csString* old, csString* new) {
     int prev = get_prot(old);
 
-    if (change_prot((uintptr_t)old, get_rw_perms()) == 0) {            
+    if (change_prot((uintptr_t)old, get_rw_perms()) == 0) {
         int sz = get_size_ptr(new);
 
         print("overwriting %p with %p\n", old, new);
@@ -32,7 +34,7 @@ void overwrite(csString* old, csString* new) {
 
 void allowOfflineInOnline(uint8_t* mem) {
     if (PATTERN_PLATFORM) {
-        int prev = get_prot(mem);        
+        int prev = get_prot(mem);
         // the is online mode and is singleplayer checks
         // are almost right next to eachother, it checks one, then checks the other
         // .. 
@@ -67,6 +69,34 @@ void allowOfflineInOnline(uint8_t* mem) {
 
 }
 
+int needsArgumentModify(const char* program) {
+    print("[needsArgumentModify] %s\n", program);
+    if (strstr(program, "java") != 0) return 1;
+    else return 0;
+}
+
+int modifyArgument(const char* program, char* arg) {
+    if (strstr(program, "java") != 0) {
+        if (strstr(arg, "--session-token=") != 0) {
+            return 0; // discard argument
+        }
+        else if (strstr(arg, "--identity-token=") != 0) {
+            return 0; // discard argument
+        }
+        else if (strstr(arg, "LD_PRELOAD") != 0) {
+            return 0; // discard env
+        }
+        else if (strstr(arg, "--auth-mode=authenticated") != 0) {
+            strcpy(arg, "--auth-mode=insecure"); // change to auth-mode=insecure ..
+            return 1; // keep argument
+        }
+        else {
+            return 1; // keep argument
+        }
+    }
+    return 1;
+}
+
 
 void swap(uint8_t* mem, csString* old, csString* new) {
     if (memcmp(mem, old, get_size_ptr(old)) == 0) {
@@ -84,15 +114,7 @@ void changeServers() {
         {.old = make_csstr(L"https://telemetry."),    .new = make_csstr(L"http://127.0.0")},
         {.old = make_csstr(L"https://tools."),        .new = make_csstr(L"http://127.0.0")},
         {.old = make_csstr(L"hytale.com"),            .new = make_csstr(L".1:59313")},
-        {.old = make_csstr(L"authenticated"),         .new = make_csstr(L"insecure")},
-        
-        // pre release 10 onwards actually verifies the token you provide here if one is provided
-        // but it also validates that you have set valid arguments and will fail if its invalid
-        // so im setting this to --singleplayer, it is always set on singleplayer worlds
-        // and takes no arguments (so the token will just be discarded ..) 
-        // .. enabling it again will therefore do absolutely nothing ..
-        {.old = make_csstr(L"--session-token=\""),    .new = make_csstr(L"--singleplayer=\"")},
-        {.old = make_csstr(L"--identity-token=\""),   .new = make_csstr(L"--singleplayer=\"")},
+
     };
 
 
@@ -114,7 +136,7 @@ void changeServers() {
     for (size_t i = 0; i < modinf.sz; i++) {
         // allow online mode in offline mode.
         allowOfflineInOnline(&memory[i]);
-        
+
         for (int sw = 0; sw < totalSwaps; sw++) {
             swap(&memory[i], &swaps[sw].old, &swaps[sw].new);
         }
@@ -124,3 +146,4 @@ void changeServers() {
 
 
 }
+

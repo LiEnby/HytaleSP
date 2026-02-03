@@ -176,6 +176,8 @@ func installJre(progress func(done int64, total int64)) error{
 	unpack := getJrePath(runtime.GOOS, runtime.GOARCH);
 
 	err = download(downloadUrl, save, progress);
+	defer os.Remove(save);
+
 	if err != nil {
 		return err;
 	}
@@ -200,12 +202,14 @@ func installJre(progress func(done int64, total int64)) error{
 
 	f, err := os.Open(save);
 	if err != nil {
+		os.RemoveAll(unpack);
 		return err;
 	}
 
 	err = unpackit.Unpack(f, unpack);
 
 	if(err != nil) {
+		os.RemoveAll(unpack);
 		return err;
 	}
 
@@ -284,11 +288,11 @@ func installGame(version int, channel string, progress func(done int64, total in
 		if err != nil {
 			return err;
 		}
-
 		os.MkdirAll(unpack, 0775);
 
 		err = applyPatch(srcPath, unpack, save, saveSig);
 		if err != nil {
+			err := os.RemoveAll(unpack);
 			return err;
 		}
 
@@ -360,7 +364,7 @@ func launchGame(version int, channel string, username string, uuid string) error
 		os.Remove(dllName);
 	}
 
-	if wCommune.Mode == "fakeonline" { // start with fake online mode
+	if wCommune.Mode == E_MODE_FAKEONLINE { // start with fake online mode
 
 		// setup fake online patch
 		go runServer();
@@ -431,7 +435,7 @@ func launchGame(version int, channel string, username string, uuid string) error
 
 		e.Process.Wait();
 
-	} else if wCommune.Mode == "authenticated" { // start authenticated
+	} else if wCommune.Mode == E_MODE_AUTHENTICATED { // start authenticated
 		if wCommune.AuthTokens == nil {
 			return errors.New("No auth token found.");
 		}

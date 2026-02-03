@@ -52,6 +52,17 @@ on linux, you need ``build-essential`` and then you can build "Aurora.so" using 
 after that you can use ``go build .`` 
 or you can use ``build-linux.sh``
 
+# Online Multiplayer 
+
+When using the "fake online" option, 
+you CAN play online multiplayer; BUT you can only join servers with the command-line flag ``--auth-mode=insecure`` set; 
+this is much simular to how minecraft works where you can only join servers with ``offline_mode=true`` in the server.properties
+
+however unlike minecraft, players using the offical game are actually unable to join "insecure" servers,
+meaning all players would have to use the 'fake online' option in this (or another) launcher to play on these servers.
+
+there are server side plugins that can get around this restriction.
+
 # Alternative names
 Originally, i called it "hytLauncher", being a play on "TLauncher" for minecraft;
 however i found that, alot of other alternative hytale launchers had a simular name, (eg HyTaLauncher, HyLauncher, etc.)

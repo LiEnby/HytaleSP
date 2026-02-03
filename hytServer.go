@@ -88,10 +88,10 @@ func readCosmetics() string {
 
 	// get currently installed gane folder ...
 
-	patchline := wCommune.Patchline;
-	selectedVersion := wCommune.SelectedVersion;
+	patchline := valToChannel(int(wCommune.Patchline));
+	gotVersion := int(wCommune.SelectedVersion+1);
 
-	assetsZip := filepath.Join( getVersionInstallPath(selectedVersion, patchline), "Assets.zip" );
+	assetsZip := filepath.Join(getVersionInstallPath(gotVersion, patchline), "Assets.zip" );
 
 	zf, err := zip.OpenReader(assetsZip);
 	if err != nil {
@@ -277,6 +277,12 @@ func handleJwksRequest(w http.ResponseWriter, req *http.Request) {
 	json.NewEncoder(w).Encode(keys);
 }
 
+func handleTelemetryRequest(w http.ResponseWriter, req *http.Request) {
+	// send telemetry to /dev/null ..
+	w.WriteHeader(204);
+}
+
+
 func logRequestHandler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("> %s %s\n", r.Method,  r.URL);
@@ -306,6 +312,8 @@ func runServer() {
 	// tools.hytale.com
 	mux.HandleFunc("/bugs/create", handleBugReport);
 	mux.HandleFunc("/feedback/create", handleFeedbacksReport);
+
+	mux.HandleFunc("/telemetry/client", handleTelemetryRequest);
 
 
 	var handler  http.Handler = mux;
@@ -337,7 +345,7 @@ func make_jwt(body any) string {
 
 func getUUID() string{
 	r, err := regexp.MatchString("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", strings.ToLower(wCommune.UUID));
-	if err == nil || r == false{
+	if err != nil || r == false{
 		m := md5.New();
 		m.Write([]byte(wCommune.Username));
 		h := hex.EncodeToString(m.Sum(nil));
