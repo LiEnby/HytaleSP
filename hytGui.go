@@ -55,7 +55,7 @@ var (
 			"release": 7,
 			"pre-release": 17,
 		},
-		SelectedVersion: 4,
+		SelectedVersion: 7-1,
 		Mode: E_MODE_FAKEONLINE,
 		AuthTokens: nil,
 		Profiles: nil,
@@ -570,9 +570,6 @@ func drawWidgets() {
 			giu.TabItem("Settings").Layout(
 				drawSettings(),
 			),
-			/*giu.TabItem("Mods").Layout(
-				giu.Custom(func(){}),
-			),*/
 		),
 	)
 }
