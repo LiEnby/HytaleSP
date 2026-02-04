@@ -1,6 +1,6 @@
 #!/bin/sh
 
 make -C Aurora
--ldflags="-s -w -buildid=" -trimpath
+go build -ldflags="-s -w -buildid=" -trimpath
 
 ./build-flatpak.sh
