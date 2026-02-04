@@ -143,18 +143,22 @@ func checkForUpdates() {
 		writeSettings();
 		cacheVersionList()
 
-		latestVersion := 1;
+		updateSelectedVerison();
+	}
+}
 
-		if wCommune.Patchline == E_PATCH_PRE_RELEASE {
-			latestVersion = int(latestPreRelease)-1;
-		} else {
-			latestVersion = int(latestRelease)-1;
-		}
+func updateSelectedVerison() {
 
+	latestVersion := 1;
 
-		if wCommune.SelectedVersion <= 0 && int(wCommune.SelectedVersion) > latestVersion {
-			wCommune.SelectedVersion = int32(latestVersion);
-		}
+	if wCommune.Patchline == E_PATCH_PRE_RELEASE {
+		latestVersion = int(wCommune.LatestVersions["pre-release"])-1;
+	} else {
+		latestVersion = int(wCommune.LatestVersions["release"])-1;
+	}
+
+	if wCommune.SelectedVersion <= 0 && int(wCommune.SelectedVersion) > latestVersion {
+		wCommune.SelectedVersion = int32(latestVersion);
 	}
 }
 
@@ -194,6 +198,8 @@ func authenticatedCheckForUpdatesAndGetProfileList() {
 
 	writeSettings();
 	cacheVersionList();
+	updateSelectedVerison();
+
 }
 
 func reAuthenticate() {
