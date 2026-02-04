@@ -6,7 +6,8 @@ command: /app/bin/HytaleSP
 
 finish-args:
 - --socket=pulseaudio
-- --socket=fallback-x11
+- --socket=x11
+- --socket=wayland
 - --share=network
 - --device=dri
 - --share=ipc
