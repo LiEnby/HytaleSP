@@ -9,5 +9,5 @@ else
   FPBUILD="flatpak run org.flatpak.Builder"
 fi
 
-$FPBUILD --force-clean build --repo=repo hytaleSP.yaml --user
+$FPBUILD --disable-rofiles-fuse --force-clean build --repo=repo hytaleSP.yaml --user
 flatpak build-bundle repo HytaleSP.flatpak trans.hytaleSP.hytaleSP
