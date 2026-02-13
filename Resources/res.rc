@@ -68,8 +68,8 @@ res_icon                ICON                    "resources\\icon.ico"
 //
 
 res_version VERSIONINFO
- FILEVERSION 1,2,1,0
- PRODUCTVERSION 1,2,1,0
+ FILEVERSION 1,2,2,0
+ PRODUCTVERSION 1,2,2,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -86,12 +86,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "HytaleSP"
             VALUE "FileDescription", "HytaleSP"
-            VALUE "FileVersion", "1.2.1.0"
+            VALUE "FileVersion", "1.2.2.0"
             VALUE "InternalName", "HytaleSP.exe"
             VALUE "LegalCopyright", "OQL"
             VALUE "OriginalFilename", "HytaleSP"
             VALUE "ProductName", "HytaleSP"
-            VALUE "ProductVersion", "1.2.1.0"
+            VALUE "ProductVersion", "1.2.2.0"
         END
     END
     BLOCK "VarFileInfo"
