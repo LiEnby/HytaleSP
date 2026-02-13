@@ -11,7 +11,10 @@ import (
 )
 
 const ACCOUNT_DATA_URL = "https://account-data.hytale.com/";
-const GAME_PATCHES_URL = "https://game-patches.hytale.com/";
+// const GAME_PATCHES_URL = "https://game-patches.hytale.com/";
+// no longer works :c
+
+const GAME_PATCHES_URL = "https://vitatricks.xyz/hytale";
 const LAUNCHER_URL     = "https://launcher.hytale.com/"
 const SESSIONS_URL     = "https://sessions.hytale.com/"
 
