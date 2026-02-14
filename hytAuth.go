@@ -20,32 +20,6 @@ const OAUTH_URL = "https://oauth.accounts.hytale.com/oauth2/auth";
 const TOKEN_URL = "https://oauth.accounts.hytale.com/oauth2/token";
 const REDIRECT_URI = "https://accounts.hytale.com/consent/client";
 
-// couldnt figure this out for some reason
-
-/*func win32_FileProtocolHandler(url string) {
-
-	urlDll, err := syscall.LoadLibrary("url.dll");
-	defer syscall.FreeLibrary(urlDll);
-
-	if err != nil {
-		fmt.Printf("err %s", err);
-		return;
-	}
-
-	fileProtocolHandler, err := syscall.GetProcAddress(urlDll, "FileProtocolHandler");
-	if err != nil {
-		fmt.Printf("err %s", err);
-		return;
-	}
-
-	urlPtr, err := syscall.BytePtrFromString(url);
-	if err != nil {
-		fmt.Printf("err %s", err);
-		return;
-	}
-
-	syscall.SyscallN(fileProtocolHandler, uintptr(unsafe.Pointer(urlPtr)));
-}*/
 
 func openUrl(url string) {
 	fmt.Printf("Opening url: %s\n", url);
@@ -125,16 +99,16 @@ func doOauth() (code string, verifier string, err error) {
 	c := make(chan string)
 
 	server := http.Server{
-			Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 
-				code := req.URL.Query().Get("code");
+			code := req.URL.Query().Get("code");
 
-				w.WriteHeader(200);
-				w.Write([]byte("Trans rights! (you are very cute, oh also authenticated ig?)"));
+			w.WriteHeader(200);
+			w.Write([]byte("Trans rights! (you are very cute, oh also authenticated ig?)"));
 
-				c <- code;
+			c <- code;
 
-			}),
+		}),
 	}
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -170,6 +144,9 @@ func verifyToken(verifier string, code string) (accessTokens, error) {
 
 	req.Header.Add("Authorization", authStr);
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded");
+	req.Header.Set("User-Agent", "hytale-launcher/2026.02.12-54e579b");
+	req.Header.Set("x-hytale-launcher-version", "2026.02.12-54e579b");
+	req.Header.Set("x-hytale-launcher-branch", "release");
 
 	// send response
 	resp, err := http.DefaultClient.Do(req);
@@ -188,15 +165,17 @@ func verifyToken(verifier string, code string) (accessTokens, error) {
 }
 
 func refreshToken(refreshToken string) (aToken accessTokens, err error){
-	authStr := "Basic " + base64.URLEncoding.EncodeToString([]byte("hytale-launcher:"));
 
 	data := url.Values{}
+	data.Set("client_id", "hytale-launcher")
 	data.Set("grant_type", "refresh_token")
 	data.Set("refresh_token", refreshToken)
 
 	req, _ := http.NewRequest("POST", TOKEN_URL, strings.NewReader(data.Encode()));
-	req.Header.Add("Authorization", authStr);
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded");
+	req.Header.Set("User-Agent", "hytale-launcher/2026.02.12-54e579b");
+	req.Header.Set("x-hytale-launcher-version", "2026.02.12-54e579b");
+	req.Header.Set("x-hytale-launcher-branch", "release");
 
 	resp, err := http.DefaultClient.Do(req);
 	if err != nil {
@@ -218,7 +197,7 @@ func getAuthTokens(previousTokens any) (atoken accessTokens, err error) {
 	if ok {
 		aToken, err := refreshToken(prevTokens.RefreshToken);
 		if err != nil {
-			return accessTokens{}, nil;
+			return accessTokens{}, err;
 		}
 		return aToken, nil;
 	} else {
