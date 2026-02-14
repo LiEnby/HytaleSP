@@ -122,7 +122,7 @@ void changeServers() {
         {.old = make_csstr(L"hytale.com"),                                                      .new = make_csstr(L".1:59313")},
 #ifdef DISABLE_TELEMETRY
         {.old = make_csstr(L"https://telemetry."),                                              .new = make_csstr(L"http://127.0.0")},
-        {.old = make_csstr(L"https://ca900df42fcf57d4dd8401a86ddd7da2@sentry.hytale.com/2"),    .new = make_csstr(L"http://transrights@127.0.0.1:59313/2")},
+        //{.old = make_csstr(L"https://ca900df42fcf57d4dd8401a86ddd7da2@sentry.hytale.com/2"),    .new = make_csstr(L"http://transrights@127.0.0.1:59313/2")},
 #endif
     };
 

@@ -9,7 +9,7 @@
 
 typedef struct PACK(csString {
     uint32_t stringSz;
-    wchar_t stringData[0x100];
+    wchar_t stringData[0x40];
 }) csString;
 
 size_t wchar_strlen(const wchar_t* str);
