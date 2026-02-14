@@ -1,14 +1,11 @@
 { 
 	"windows": {
 		"pre-release": [
-			{"version": 6, "steps": [ [0, 5], [5, 6] ]},
 			{"version": 21, "steps": [ [0, 20], [20, 21] ]},
 		]
 	},
 	"darwin": {
 		"pre-release": [
-			{"version": 5, "steps": [ [0, 4], [4, 5] ]},
-			{"version": 8, "steps": [ [0, 7], [7, 8] ]},
 			{"version": 21, "steps": [ [0, 20], [20, 21] ]},
 		]
 	},

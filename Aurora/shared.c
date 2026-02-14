@@ -16,6 +16,8 @@
 #define WIN32_MEAN_AND_LEAN 1
 #include <windows.h>
 #include <psapi.h>
+ 
+#define wait() printf("line: %d\n", __LINE__); fgets(a, sizeof(a) - 1, stdin)
 #endif
 
 
@@ -71,18 +73,18 @@ int get_prot(void* addr) {
 }
 
 #ifdef __linux__ 
-int execvpe(const char* filename, char* const argv[], char* const envp[]);
-int execve(const char* filename, char* const argv[], char* const envp[]) {
+int execvpe(const char* filename, char* const argv[], char* const wenvp[]);
+int execve(const char* filename, char* const argv[], char* const wenvp[]) {
 
 	if (argv == NULL) return -1;
-	if (envp == NULL) return -1;
+	if (wenvp == NULL) return -1;
 
 	const char* program = filename;
 	if (program == NULL) program = argv[0];
 	if (program == NULL) return -1;
 
 	if (needsArgumentModify(program) == 0) {
-		return execvpe(filename, argv, envp);
+		return execvpe(filename, argv, wenvp);
 	}
 
 	// count args
@@ -90,8 +92,8 @@ int execve(const char* filename, char* const argv[], char* const envp[]) {
 	for (argc = 0; argv[argc] != NULL; argc++);
 
 	// count envs
-	size_t envc = 0;
-	for (envc = 0; envp[envc] != NULL; envc++);
+	size_t wenvc = 0;
+	for (wenvc = 0; wenvp[wenvc] != NULL; wenvc++);
 
 	// allocate new argv
 	size_t sz = (argc * sizeof(char*)) + 1;
@@ -101,10 +103,10 @@ int execve(const char* filename, char* const argv[], char* const envp[]) {
 
 
 	// allocate new envp
-	sz = (envc * sizeof(char*)) + 1;
-	char** new_envp = malloc(sz);
-	memset(new_envp, 0x00, sz);
-	size_t new_envc = 0;
+	sz = (wenvc * sizeof(char*)) + 1;
+	char** new_wenvp = malloc(sz);
+	memset(new_wenvp, 0x00, sz);
+	size_t new_wenvc = 0;
 
 	// run modifyArgument on all arguments ..
 	for (int i = 0; i < argc; i++) {
@@ -116,18 +118,18 @@ int execve(const char* filename, char* const argv[], char* const envp[]) {
 	}
 
 	// run modifyArgument on all environment variabless ..
-	for (int i = 0; i < envc; i++) {
-		int keep = modifyArgument(program, envp[i]);
+	for (int i = 0; i < wenvc; i++) {
+		int keep = modifyArgument(program, wenvp[i]);
 		if (keep == 1) {
-			new_envp[new_envc] = envp[i];
-			new_envc++;
+			new_wenvp[new_wenvc] = wenvp[i];
+			new_wenvc++;
 		}
 	}
 
-	int ret = execvpe(filename, new_argv, new_envp);
+	int ret = execvpe(filename, new_argv, new_wenvp);
 
 	free(new_argv);
-	free(new_envp);
+	free(new_wenvp);
 
 	return ret;
 }
@@ -147,6 +149,10 @@ BOOL WINAPI CreateProcessW_hook(
 	LPSTARTUPINFOW lpStartupInfo,
 	LPPROCESS_INFORMATION lpProcessInformation
 ) {
+	char a[0x100] = { 0 };
+	// 
+	// remove session token from command line arguments.
+	//
 	int wargc = 0;
 
 	wchar_t** wargv = CommandLineToArgvW(lpCommandLine, &wargc);
@@ -173,21 +179,19 @@ BOOL WINAPI CreateProcessW_hook(
 		return CreateProcessW_original(lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation);
 	}
 
-
 	// allocate new argv, 
 	int new_argc = 0;
 	sz = (wargc * sizeof(wchar_t*)) + 1;
 	wchar_t** new_wargv = malloc(sz);
 	assert(new_wargv != NULL);
-
 	memset(new_wargv, 0x00, sz);
 
 	// check each argument against modifyArgument.
-
 	for (int i = 0; i < wargc; i++) {
 
 		len = WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, NULL, 0, NULL, NULL);
 		sz = (len * sizeof(char)) + 1;
+
 		char* arg = malloc(sz);
 		assert(arg != NULL);
 		memset(arg, 0x00, sz);
@@ -197,19 +201,19 @@ BOOL WINAPI CreateProcessW_hook(
 
 		if (keep == 1) {
 			len = MultiByteToWideChar(CP_UTF8, 0, arg, -1, NULL, 0);
+
+
 			sz = (len * sizeof(wchar_t)) + 1;
 			wchar_t* warg = malloc(sz);
 			assert(warg != NULL);
 			memset(warg, 0x00, sz);
 
 			MultiByteToWideChar(CP_UTF8, 0, arg, -1, warg, len);
-
 			new_wargv[new_argc] = warg;
 			new_argc++;
 		}
 
 		free(arg);
-
 	}
 
 	free(program);
@@ -230,14 +234,82 @@ BOOL WINAPI CreateProcessW_hook(
 		}
 	}
 
-	for (int i = 0; new_wargv[i] != NULL; i++) {
+	for (int i = 0; i < new_argc; i++) {
 		free(new_wargv[i]);
 		new_wargv[i] = NULL;
 	}
 	free(new_wargv);
 
+	//
+	// remove session token from environement block
+	//
+
+	// count environment variables
+	wait();
+	wchar_t** wenvp = (wchar_t**)lpEnvironment;
+	size_t wenvc = 0;
+	for (wenvc = 0; wenvp[wenvc] != NULL; wenvc++);
+	printf("wenvc = %x\n", wenvc);
+	wait();
+
+	// allocate new envp
+	wait();
+	sz = (wenvc * sizeof(wchar_t*)) + 1;
+	wchar_t** new_wenvp = malloc(sz);
+	assert(new_wenvp != NULL);
+	wait();
+	memset(new_wenvp, 0x00, sz);
+	size_t new_wenvc = 0;
+
+	// run modifyArgument on all environment variables ..
+	for (int i = 0; i < wenvc; i++) {
+
+		len = WideCharToMultiByte(CP_UTF8, 0, wenvp[i], -1, NULL, 0, NULL, NULL);
+		sz = (len * sizeof(char)) + 1;
+		wait();
+
+		char* env = malloc(sz);
+		assert(env != NULL);
+		memset(env, 0x00, sz);
+		wait();
+
+		WideCharToMultiByte(CP_UTF8, 0, wenvp[i], -1, env, len, NULL, NULL);
+		int keep = modifyArgument(program, env);
+		wait();
+
+		if (keep == 1) {
+			wait();
+
+			len = MultiByteToWideChar(CP_UTF8, 0, env, -1, NULL, 0);
+			wait();
+
+			sz = (len * sizeof(wchar_t)) + 1;
+			wchar_t* wenv = malloc(sz);
+			assert(wenv != NULL);
+			memset(wenv, 0x00, sz);
+
+			wait();
+			MultiByteToWideChar(CP_UTF8, 0, env, -1, wenv, len);
+			new_wenvp[new_wenvc] = wenv;
+			new_wenvc++;
+		}
+		wait();
+
+		free(env);
+	}
+
 	// create process ..
-	return CreateProcessW_original(lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation);
+	int ret = CreateProcessW_original(lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation);
+
+	wait();
+
+	for (int i = 0; i < new_wenvc; i++) {
+		free(new_wenvp[i]);
+		new_wenvp[i] = NULL;
+	}
+
+	wait();
+	free(new_wenvp);
 }
 #endif
 
