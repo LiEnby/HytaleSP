@@ -16,8 +16,6 @@
 #define WIN32_MEAN_AND_LEAN 1
 #include <windows.h>
 #include <psapi.h>
- 
-#define wait() printf("line: %d\n", __LINE__); fgets(a, sizeof(a) - 1, stdin)
 #endif
 
 
@@ -149,7 +147,6 @@ BOOL WINAPI CreateProcessW_hook(
 	LPSTARTUPINFOW lpStartupInfo,
 	LPPROCESS_INFORMATION lpProcessInformation
 ) {
-	char a[0x100] = { 0 };
 	// 
 	// remove session token from command line arguments.
 	//
@@ -181,7 +178,7 @@ BOOL WINAPI CreateProcessW_hook(
 
 	// allocate new argv, 
 	int new_argc = 0;
-	sz = (wargc * sizeof(wchar_t*)) + 1;
+	sz = (wargc * sizeof(wchar_t*)) + sizeof(uintptr_t);
 	wchar_t** new_wargv = malloc(sz);
 	assert(new_wargv != NULL);
 	memset(new_wargv, 0x00, sz);
@@ -190,7 +187,7 @@ BOOL WINAPI CreateProcessW_hook(
 	for (int i = 0; i < wargc; i++) {
 
 		len = WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, NULL, 0, NULL, NULL);
-		sz = (len * sizeof(char)) + 1;
+		sz = (len * sizeof(char)) + sizeof(char);
 
 		char* arg = malloc(sz);
 		assert(arg != NULL);
@@ -202,8 +199,7 @@ BOOL WINAPI CreateProcessW_hook(
 		if (keep == 1) {
 			len = MultiByteToWideChar(CP_UTF8, 0, arg, -1, NULL, 0);
 
-
-			sz = (len * sizeof(wchar_t)) + 1;
+			sz = (len * sizeof(wchar_t)) + sizeof(wchar_t);
 			wchar_t* warg = malloc(sz);
 			assert(warg != NULL);
 			memset(warg, 0x00, sz);
@@ -216,7 +212,6 @@ BOOL WINAPI CreateProcessW_hook(
 		free(arg);
 	}
 
-	free(program);
 	LocalFree(wargv);
 
 	// build lpCommandLine ... 
@@ -243,73 +238,47 @@ BOOL WINAPI CreateProcessW_hook(
 	//
 	// remove session token from environement block
 	//
-
-	// count environment variables
-	wait();
-	wchar_t** wenvp = (wchar_t**)lpEnvironment;
+	
+	wchar_t* wenv = lpEnvironment;
 	size_t wenvc = 0;
-	for (wenvc = 0; wenvp[wenvc] != NULL; wenvc++);
-	printf("wenvc = %x\n", wenvc);
-	wait();
 
-	// allocate new envp
-	wait();
-	sz = (wenvc * sizeof(wchar_t*)) + 1;
-	wchar_t** new_wenvp = malloc(sz);
-	assert(new_wenvp != NULL);
-	wait();
-	memset(new_wenvp, 0x00, sz);
-	size_t new_wenvc = 0;
+	// count total size of environment block ...
+	for (wenvc = 0; wcscmp(&wenv[wenvc], "") != 0; wenvc += wcslen(&wenv[wenvc]) + 1);
+	
+	sz = (wenvc * sizeof(wchar_t)) + sizeof(wchar_t);
+	wchar_t* new_wenv = malloc(sz);
+	assert(new_wenv != NULL);
+	memset(new_wenv, 0x00, sz);
+	size_t new_envc = 0;
 
-	// run modifyArgument on all environment variables ..
-	for (int i = 0; i < wenvc; i++) {
-
-		len = WideCharToMultiByte(CP_UTF8, 0, wenvp[i], -1, NULL, 0, NULL, NULL);
+	for (int i = 0; wcscmp(&wenv[i], "") != 0; i += wcslen(&wenv[i]) + 1) {
+		len = WideCharToMultiByte(CP_UTF8, 0, &wenv[i], -1, NULL, 0, NULL, NULL);
 		sz = (len * sizeof(char)) + 1;
-		wait();
 
-		char* env = malloc(sz);
-		assert(env != NULL);
-		memset(env, 0x00, sz);
-		wait();
+		char* n_env = malloc(sz);
+		assert(n_env != NULL);
+		memset(n_env, 0x00, sz);
 
-		WideCharToMultiByte(CP_UTF8, 0, wenvp[i], -1, env, len, NULL, NULL);
-		int keep = modifyArgument(program, env);
-		wait();
-
+		WideCharToMultiByte(CP_UTF8, 0, &wenv[i], -1, n_env, len, NULL, NULL);
+		
+		int keep = modifyArgument(program, n_env);
 		if (keep == 1) {
-			wait();
-
-			len = MultiByteToWideChar(CP_UTF8, 0, env, -1, NULL, 0);
-			wait();
-
-			sz = (len * sizeof(wchar_t)) + 1;
-			wchar_t* wenv = malloc(sz);
-			assert(wenv != NULL);
-			memset(wenv, 0x00, sz);
 
 			wait();
-			MultiByteToWideChar(CP_UTF8, 0, env, -1, wenv, len);
-			new_wenvp[new_wenvc] = wenv;
-			new_wenvc++;
+			MultiByteToWideChar(CP_UTF8, 0, n_env, -1, &new_wenv[new_envc], len);
+			new_envc += wcslen(&new_wenv[new_envc]) + 1;
+
 		}
-		wait();
-
-		free(env);
+		free(n_env);
 	}
+	new_envc++;
 
-	// create process ..
+	memcpy(wenv, new_wenv, new_envc * sizeof(wchar_t));
+	free(new_wenv);
+	free(program);
+
 	int ret = CreateProcessW_original(lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo, lpProcessInformation);
 
-	wait();
-
-	for (int i = 0; i < new_wenvc; i++) {
-		free(new_wenvp[i]);
-		new_wenvp[i] = NULL;
-	}
-
-	wait();
-	free(new_wenvp);
 }
 #endif
 

@@ -76,7 +76,9 @@ int needsArgumentModify(const char* program) {
 }
 
 int modifyArgument(const char* program, char* arg) {
+    print("[modifyArgument] checking %s, %s\n", program, arg);
     if (strstr(program, "java") != 0) {
+
         if (strstr(arg, "--session-token=") != 0) {
             return 0; // discard argument
         }
