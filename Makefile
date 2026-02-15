@@ -1,7 +1,7 @@
-GOC := go
-RCC := windres
-LDFLAGS := -X main.wVersion=$(shell git describe --abbrev=0 --exclude=continuous --tags) -s -w
-GOFLAGS := -trimpath
+GOC ?= go
+RCC ?= windres
+LDFLAGS ?= -X main.wVersion=$(shell git describe --abbrev=0 --exclude=continuous --tags) -s -w
+GOFLAGS ?= -trimpath
 
 AURORA := Aurora/Build/Aurora
 BINARY := HytaleSP
@@ -24,19 +24,20 @@ $(BINARY)$(EXE): setup $(AURORA)$(DLL) $(OBJ)
 	$(GOC) build -ldflags="$(LDFLAGS)" $(GOFLAGS) -o $@ .
 
 $(AURORA)$(DLL):
+# use msbuild if vscmd otherwise use make
 ifeq ($(VSCMD_VER),)
 	make -C Aurora
 else
 	msbuild Aurora/Aurora.slnx /p:Configuration=Release
 endif
-	
+
 ifeq ($(TARGET),Windows)
-resources.syso:
+resources.syso Resources/res.rc:
 	$(RCC) Resources/res.rc -O coff -o $@
 endif
 
-ifeq ($(TARGET),Linux)
 # TODO: Move flatpak build outside of shell scripts.
+ifeq ($(TARGET),Linux)
 @PHONY: flatpak
 flatpak: $(BINARY)$(EXE)
 	flatpak install org.freedesktop.Sdk//25.08 org.flatpak.Builder --system -y
