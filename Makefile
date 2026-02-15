@@ -35,8 +35,8 @@ endif
 @PHONY: flatpak
 flatpak: $(BINARY)$(EXE)
 	flatpak install org.freedesktop.Sdk//25.08 org.flatpak.Builder --system -y
-	cd flatpak || exit
-	./buildpak.sh
+	cd flatpak && ./buildpak.sh
+	mv flatpak/$(BINARY).flatpak ./$(BINARY).flatpak
 
 @PHONY: setup
 setup:
@@ -47,4 +47,5 @@ setup:
 clean:
 	-$(DELCMD) $(BINARY)$(EXE)
 	-$(DELCMD) $(SYSO)
+	-$(DELCMD) $(BINARY).flatpak
 	-make -C Aurora clean
