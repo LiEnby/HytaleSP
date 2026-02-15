@@ -25,11 +25,11 @@ $(BINARY): $(OBJ)
 	$(CC) -o $@ $^ $(CFLAGS)
 
 
-.PHONY: setup
+@PHONY: setup
 setup:
 	-mkdir $(OUTDIR)
 
-.PHONY: clean
+@PHONY: clean
 clean:
 	-$(DELCMD) *.o
 	-$(DELCMD) Build

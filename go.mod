@@ -3,6 +3,7 @@ module HytaleSP
 go 1.25.3
 
 require (
+	git.silica.codes/Li/UpdateChecker v1.0.0
 	github.com/AllenDang/cimgui-go v1.3.2-0.20250409185506-6b2ff1aa26b5
 	github.com/AllenDang/giu v0.14.1
 	github.com/c4milo/unpackit v1.0.0

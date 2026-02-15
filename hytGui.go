@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"image"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"time"
 
+	"git.silica.codes/Li/UpdateChecker"
 	"github.com/AllenDang/cimgui-go/imgui"
 	"github.com/AllenDang/giu"
 	"github.com/ncruces/zenity"
@@ -32,6 +34,8 @@ type launcherCommune struct {
 	GameFolder string `json:"install_directory"`
 	UserDataFolder string `json:"userdata_directory"`
 	JreFolder string `json:"jre_directory"`
+
+	AutoUpdates bool `json:"automatic_updates"`
 
 	// Debug Settings
 	UUID string `json:"uuid_override"`
@@ -66,6 +70,7 @@ var (
 		Profiles: nil,
 		SelectedProfile: 0,
 
+		AutoUpdates: true,
 		GameFolder: DefaultGameFolder(),
 		UserDataFolder: DefaultUserDataFolder(),
 		JreFolder: DefaultJreFolder(),
@@ -82,6 +87,7 @@ var (
 		"pre-release" : map[int]bool{},
 	}
 	wImGuiWindow *giu.WindowWidget = nil;
+	wVersion = "no-version";
 )
 
 
@@ -127,7 +133,7 @@ func doAuthentication() {
 }
 
 
-func checkForUpdates() {
+func checkForGameUpdatess() {
 	if wCommune.Mode != E_MODE_AUTHENTICATED {
 		lastRelease := wCommune.LatestVersions["release"]
 		lastPreRelease := wCommune.LatestVersions["pre-release"]
@@ -152,6 +158,76 @@ func checkForUpdates() {
 
 	}
 }
+
+func checkForLauncherUpdates() {
+	// cleanup .old file
+	exePath, err := os.Executable();
+	oldPath := exePath + ".old";
+	_, err = os.Stat(oldPath);
+	if err == nil {
+		os.Remove(oldPath);
+	}
+
+
+	if wCommune.AutoUpdates {
+		UpdateChecker.Init(UpdateChecker.Repository{
+			Domain: "git.silica.codes",
+			Owner: "Li",
+			Name: "HytaleSP",
+		}, wVersion);
+
+		updateInfo, err :=  UpdateChecker.CheckForUpdate();
+
+		if err != nil {
+			return;
+		}
+
+		if updateInfo != nil {
+			err := zenity.Question(fmt.Sprintf("A new version of HytaleSP was found!\nVersion: %s\n%s", updateInfo.NewVersion, updateInfo.Description),
+					       zenity.Title("HytaleSP Update"), zenity.QuestionIcon, zenity.OKLabel("Install"), zenity.CancelLabel("Not Now"), zenity.ExtraButton("Never"));
+			if err != nil {
+				if err != zenity.ErrCanceled {
+					return;
+				}
+				if(err != zenity.ErrExtraButton) {
+					wCommune.AutoUpdates = false;
+				}
+			}
+
+
+			if err != nil {
+				showErrorDialog(fmt.Sprintf("Error getting update: %s", err), "Update Fail");
+				return;
+			}
+
+			success := false;
+
+			switch(runtime.GOOS) {
+				case "windows":
+					success = UpdateChecker.DownloadUpdateIfPresent("HytaleSP.exe", exePath);
+				case "linux":
+					success = UpdateChecker.DownloadUpdateIfPresent("HytaleSP", exePath);
+			}
+
+			if success {
+				e := exec.Command(exePath);
+				e.Args = os.Args;
+				e.Start();
+				os.Exit(0);
+			} else {
+				showErrorDialog("Error to download update.", "Update Fail");
+				return;
+			}
+
+		}
+
+		fmt.Printf("No update found.\n");
+		return;
+
+
+	}
+}
+
 
 func updateSelectedVerison() {
 
@@ -256,7 +332,7 @@ func writeSettings() {
 
 func getDefaultSettings() {
 	writeSettings();
-	go checkForUpdates();
+	go checkForGameUpdatess();
 
 }
 
@@ -649,7 +725,7 @@ func drawWidgets() {
 
 func createWindow() error {
 
-	wMainWin = giu.NewMasterWindow("HytaleSP", 800, 360, 0);
+	wMainWin = giu.NewMasterWindow(fmt.Sprintf("HytaleSP %s", wVersion), 800, 360, 0);
 	if wMainWin == nil {
 		return fmt.Errorf("result from NewMasterWindow was nil");
 	}
@@ -706,6 +782,8 @@ func main() {
 		}
 	}
 
+	go checkForLauncherUpdates();
+
 	os.MkdirAll(MainFolder(), 0775);
 	os.MkdirAll(LauncherFolder(), 0775);
 	os.MkdirAll(ServerDataFolder(), 0775);
@@ -718,7 +796,7 @@ func main() {
 
 	cacheVersionList();
 	go reAuthenticate();
-	go checkForUpdates();
+	go checkForGameUpdatess();
 
 	dataFixerUpper(wCommune.FormatVersion);
 

@@ -377,7 +377,7 @@ void* hook_export_func(const char* targetModuleName, const char* targetFunctionN
 					// change function ptr
 					int prev = get_prot(&imageThunkData[ii]);
 					if (change_prot((uintptr_t)&imageThunkData[ii], get_rw_perms()) == 0) {
-						(void*)imageThunkData[ii].u1.Function = newPtr;
+						*(void**)&(imageThunkData[ii].u1.Function) = newPtr;
 					}
 					change_prot((uintptr_t)&imageThunkData[ii], prev);
 
