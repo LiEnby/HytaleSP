@@ -6,16 +6,23 @@ An alternative launcher for "Hytale" with a fairly streightforward "native" UI
  - Multiple version management
  - Incremental patch from one version to another
  - Universal "online fix" or that works on all versions;
- - Access all "Supporter" and "Cursebreaker" cosmetic items.
+ - Auth server emulation is implemented locallyy 
  - Play local or online multiplayer
  - Completely standalone; a single executable- no butler or other external tools.
  - Fairly transparent online patch implementation.
  - Run offline and download without needing a hytale account.
+ - The game can be played offline with all features no external auth server
  - Supports Windows 7+
  
-Currently for: Windows and Linux (i would do MacOS, but i dont have access to an ARM Mac right now.)
+ Currently for: Windows and Linux (i would do MacOS, but i dont have access to an ARM Mac right now.)
 
+Design Philosophy:
 
+	-> everything (except version downloads) is run locally on-device, (including the auth server for "fakeonline")
+	-> telemetry is disabled for the game itself
+	-> the software should not make use of Electron or any heavy UI frameworks (Currently: GIU/imgui)
+	-> no hard modifications to the EXE, all client modifications are done via injecting DLLs
+	
 NOTE: you can even probably play online, but only if the servers your joining have ``--auth-mode=insecure`` set in the command line;
 enabling this option would also mean anyone using the offical launcher cannot play 
 because it doesn't allow insecure auth type outside singleplayer offline mode; .. for some reason

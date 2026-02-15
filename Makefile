@@ -1,8 +1,9 @@
 GOC ?= go
 RCC ?= windres
-LDFLAGS ?= -X main.wVersion=$(shell git describe --abbrev=0 --exclude=continuous --tags) -s -w
+LDFLAGS ?= -X main.wVersion=$(TAG) -s -w
 GOFLAGS ?= -trimpath
 
+TAG := $(shell git describe --abbrev=0 --exclude=continuous --tags)
 AURORA := Aurora/Build/Aurora
 BINARY := HytaleSP
 DELCMD := $(if $(filter-out $(OS),Windows_NT),rm -rf,del /Q /F /S)
@@ -32,7 +33,13 @@ else
 endif
 
 ifeq ($(TARGET),Windows)
-resources.syso Resources/res.rc:
+COMMA := ,
+NORM_VER := $(subst $(subst ,, ),.,$(foreach IDX,1 2 3 4,$(if $(word $(IDX),$(subst ., ,$(subst v,,$(TAG)))),$(word $(IDX),$(subst ., ,$(subst v,,$(TAG)))),0)))
+
+Resources/version.h:
+	echo #define VER $(subst .,$(COMMA),$(NORM_VER)) >$@
+	echo #define VERSTR "$(NORM_VER)" >>$@
+resources.syso: Resources/version.h
 	$(RCC) Resources/res.rc -O coff -o $@
 endif
 
@@ -57,4 +64,5 @@ clean:
 	-$(DELCMD) $(BINARY)$(EXE)
 	-$(DELCMD) $(OBJ)
 	-$(DELCMD) $(BINARY).flatpak
+	-$(DELCMD) Resources\version.h
 	-make -C Aurora clean
