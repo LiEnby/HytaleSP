@@ -471,6 +471,12 @@ func handleTelemetryRequest(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(204);
 }
 
+func handleSentryRequest(w http.ResponseWriter, req *http.Request) {
+	w.Header().Add("Content-Type", "application/json");
+	w.WriteHeader(200);
+
+	w.Write([]byte { '{', '}' });
+}
 
 func logRequestHandler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -517,6 +523,10 @@ func runServer() {
 
 	// telemetry.hytale.com
 	mux.HandleFunc("/telemetry/client", handleTelemetryRequest);
+
+	// sentry.hytale.com
+	mux.HandleFunc("/api/2/envelope", handleSentryRequest);
+
 
 	// game-patches.hytale.com ..
 	//mux.HandleFunc("/patches/{target}/{arch}/{branch}/{patch}", handleManifest);
