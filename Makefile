@@ -51,12 +51,9 @@ flatpak: $(BINARY)$(EXE)
 	mv flatpak/$(BINARY).flatpak ./$(BINARY).flatpak
 endif
 
-.PHONY: submodules
-submodules:
-	git submodule update --init --recursive
-	
+
 .PHONY: setup
-setup: submodules
+setup: get-submodules
 ifeq ($(TARGET),Windows)
 	-win7go
 endif
@@ -69,11 +66,14 @@ clean:
 	-$(DELCMD) $(BINARY).flatpak
 	-$(DELCMD) Resources\version.h
 	-make -C Aurora clean
-
+.PHONY: get-submodules
+get-submodules:
+	git submodule update --init --recursive
+	
 	
 .PHONY: update-submodule
 update-submodule:
-	git checkout main
-	git add -A 
-	git commit
-	git push
+	cd Aurora && git checkout main
+	cd Aurora && git add -A 
+	cd Aurora && git commit
+	cd Aurora && git push
