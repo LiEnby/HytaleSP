@@ -21,6 +21,49 @@ import (
 )
 
 
+func run(e *exec.Cmd) error {
+
+	stdout, oerr := e.StdoutPipe();
+	stderr, eerr := e.StderrPipe();
+
+	err := e.Start();
+
+	if err != nil {
+		return err;
+	}
+
+	if wVersion == "no-version" {
+		go func() {
+			if oerr == nil {
+				stdout_scan := bufio.NewScanner(stdout)
+				stdout_scan.Split(bufio.ScanRunes)
+				for stdout_scan.Scan() {
+					r := stdout_scan.Text()
+					os.Stdout.WriteString(r);
+				}
+			}
+		}();
+
+		go func() {
+			if eerr == nil {
+				stderr_scan := bufio.NewScanner(stderr)
+				stderr_scan.Split(bufio.ScanRunes)
+				for stderr_scan.Scan() {
+					r := stderr_scan.Text()
+					os.Stderr.WriteString(r);
+				}
+			}
+		}();
+	}
+
+	proc, err := e.Process.Wait();
+	if proc.ExitCode() != 0 {
+		return fmt.Errorf("Process exited with non-0 exit code: %d", proc.ExitCode());
+	}
+
+	return nil;
+}
+
 func urlToPath(targetUrl string) string {
 	nurl, _ := url.Parse(targetUrl);
 	npath := strings.TrimPrefix(nurl.Path, "/");
@@ -425,6 +468,7 @@ func findClientBinary(version int, channel string) string {
 	}
 }
 
+
 func launchGame(version int, channel string, username string, uuid string) error{
 
 	javaBin, _ := findJavaBin().(string);
@@ -507,7 +551,6 @@ func launchGame(version int, channel string, username string, uuid string) error
 		fmt.Printf("Running: %s\n", strings.Join(e.Args, " "))
 
 		e.Env = e.Environ();
-
 		e.Env = append(e.Env, "AURORA_ENABLE_INSECURE_SERVERS=true");
 		e.Env = append(e.Env, "AURORA_ENABLE_AUTH_SWAP=true");
 		e.Env = append(e.Env, "AURORA_ENABLE_SINGLEPLAYER_AS_INSECURE=true");
@@ -517,42 +560,19 @@ func launchGame(version int, channel string, username string, uuid string) error
 		e.Env = append(e.Env, "AURORA_TELEMETRY=http://127.0.0");
 		e.Env = append(e.Env, "AURORA_HYTALE_COM=.1:59313");
 
-		stdout, stdouterr := e.StdoutPipe();
-		stderr, stderrerr := e.StderrPipe();
-
-		err = e.Start();
-
-		if stdouterr == nil {
-			stdout_scan := bufio.NewScanner(stdout)
-			stdout_scan.Split(bufio.ScanWords)
-			for stdout_scan.Scan() {
-				m := stdout_scan.Text()
-				fmt.Println(m)
-			}
-		}
-
-		if stderrerr == nil {
-			stderr_scan := bufio.NewScanner(stderr)
-			stderr_scan.Split(bufio.ScanWords)
-			for stderr_scan.Scan() {
-				m := stderr_scan.Text()
-				fmt.Errorf(m)
-			}
-		}
-
+		err = run(e);
 
 		if err != nil {
 			return err;
 		}
 
+		// clear ld preload
 		switch(runtime.GOOS) {
 			case "linux":
 				os.Unsetenv("LD_PRELOAD");
 			case "darwin":
 				os.Unsetenv("DYLD_INSERT_LIBRARIES ");
 		}
-
-		e.Process.Wait();
 
 	} else if wCommune.Mode == E_MODE_AUTHENTICATED { // start authenticated
 		if wCommune.AuthTokens == nil {
@@ -592,13 +612,13 @@ func launchGame(version int, channel string, username string, uuid string) error
 
 		fmt.Printf("Running: %s\n", strings.Join(e.Args, " "))
 
-		err = e.Start();
+
+		err = run(e);
 
 		if err != nil {
 			return err;
 		}
 
-		e.Process.Wait();
 	} else { // start in offline mode
 
 		e := exec.Command(clientBinary,
@@ -617,14 +637,11 @@ func launchGame(version int, channel string, username string, uuid string) error
 
 		fmt.Printf("Running: %s %s\n", clientBinary, strings.Join(e.Args, " "))
 
-		err := e.Start();
+		err := run(e);
 
 		if err != nil {
 			return err;
 		}
-
-
-		e.Process.Wait();
 	}
 	return nil;
 }
