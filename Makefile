@@ -72,9 +72,5 @@ get-submodules:
 	
 	
 .PHONY: update-submodule
-update-submodule:
-	-cd Aurora && git checkout main
-	-cd Aurora && git add -A 
-	-cd Aurora && git commit
-	-cd Aurora && git push
+update-submodules:
 	git submodule update --remote --merge
