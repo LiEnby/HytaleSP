@@ -9,7 +9,6 @@ import (
 	"strings"
 )
 
-const HYTALE_LAUNCHER_VERSION = "2026.02.12-54e579b";
 
 func createRequest(method string, url string, body any) (*http.Request, error) {
 
@@ -40,8 +39,8 @@ func createRequest(method string, url string, body any) (*http.Request, error) {
 	// impersonate the offical hytale launcher ..
 	// for some reason this makes our refresh token actually stick :?
 
-	req.Header.Set("user-agent", "hytale-launcher/"+HYTALE_LAUNCHER_VERSION);
-	req.Header.Set("x-hytale-launcher-version", HYTALE_LAUNCHER_VERSION);
+	req.Header.Set("user-agent", "hytale-launcher/"+wCommune.SpoofLauncherVersion );
+	req.Header.Set("x-hytale-launcher-version", wCommune.SpoofLauncherVersion );
 	req.Header.Set("x-hytale-launcher-branch", "release");
 
 

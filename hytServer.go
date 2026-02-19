@@ -8,11 +8,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,8 +28,9 @@ const DEFAULT_COSMETICS = "{\"bodyCharacteristic\":[\"Default\",\"Muscular\"],\"
 
 const DEFAULT_SKIN = "{\"bodyCharacteristic\":\"Default.11\",\"underwear\":\"Bra.Blue\",\"face\":\"Face_Neutral\",\"ears\":\"Ogre_Ears\",\"mouth\":\"Mouth_Makeup\",\"haircut\":\"SideBuns.Black\",\"facialHair\":null,\"eyebrows\":\"RoundThin.Black\",\"eyes\":\"Plain_Eyes.Green\",\"pants\":\"Icecream_Skirt.Strawberry\",\"overpants\":\"LongSocks_Bow.Lime\",\"undertop\":\"VNeck_Shirt.Black\",\"overtop\":\"NeckHigh_Savanna.Pink\",\"shoes\":\"Wellies.Orange\",\"headAccessory\":null,\"faceAccessory\":null,\"earAccessory\":null,\"skinFeature\":null,\"gloves\":null,\"cape\":null}";
 
-const SERVER_PROTOCOL =  "http://"
-const SERVER_URI = "127.0.0.1:59313"
+var SERVER_PROTOCOL =  "http://"
+var SERVER_HOST = "127.0.0.1"
+var SERVER_PORT = (1028) + rand.IntN(65535-1028);
 
 const CURRENT_FMT_VERSION = 1;
 
@@ -37,6 +40,17 @@ var (
 	sSkinLoaded = false;
 )
 
+func getSentryUrl() string {
+	return SERVER_PROTOCOL + "transrights" + "@" + getServerHostPort() + "/2";
+}
+
+func getServerHostPort() string {
+	return SERVER_HOST + ":" + strconv.Itoa(SERVER_PORT);
+}
+
+func getServerUrl() string {
+	return SERVER_PROTOCOL + getServerHostPort();
+}
 
 func getOldSkinJsonPath() string {
 	return filepath.Join(ServerDataFolder(), "skin.json");
@@ -52,6 +66,7 @@ func readOldSkinData() string {
 
 	_, err := os.Stat(load);
 	if err != nil {
+		fmt.Printf("[Server] Failed to read old skinfile, falling back on default\n");
 		return DEFAULT_SKIN;
 	}
 	skinData, _ := os.ReadFile(load);
@@ -62,7 +77,7 @@ func readOldSkinData() string {
 func writeSkinData() {
 	save := getNewSkinJsonPath();
 	os.MkdirAll(filepath.Dir(save), 0666);
-	fmt.Printf("Writing skin data %s\n", save);
+	fmt.Printf("[Server] Writing skin data %s\n", save);
 
 	newSkinData, err := json.Marshal(sSkin);
 	if  err != nil {
@@ -100,7 +115,7 @@ func readSkinData() {
 
 func readCosmeticsIdFromAssets(zf *zip.ReadCloser, zpath string ) []string {
 	defs := []cosmeticDefinition{};
-	fmt.Printf("Opening: %s\n", zpath);
+	fmt.Printf("[Server] Opening asesets file: %s\n", zpath);
 
 	f, err := zf.Open(zpath);
 	if err != nil{
@@ -134,7 +149,7 @@ func readCosmetics() string {
 
 	zf, err := zip.OpenReader(assetsZip);
 	if err != nil {
-		fmt.Printf("err: %s\n", err);
+		fmt.Printf("[Server] failed to read assets zip: %s, falling back on default cosmetics\n", err);
 		return DEFAULT_COSMETICS;
 	}
 	defer zf.Close();
@@ -166,11 +181,11 @@ func readCosmetics() string {
 	cosmeticsJson, err := json.Marshal(inventory);
 
 	if err != nil {
-		fmt.Printf("err: %s\n", err);
+		fmt.Printf("[Server] failed to read cosmetics from assets, falling back on default: %s\n", err);
 		return DEFAULT_COSMETICS;
 	}
 
-	fmt.Printf("Full Cosmetics List: %s\n", cosmeticsJson);
+	fmt.Printf("[Server] Read Cosmetics List.\n");
 
 	return string(cosmeticsJson);
 }
@@ -278,7 +293,7 @@ func initSkinData(skinData string) {
 }
 
 func migrateSkinData() {
-	fmt.Printf("Migrating skin data ...\n");
+	fmt.Printf("[Server] Migrating skin data ...\n");
 
 	oldSkinData := readOldSkinData();
 	initSkinData(oldSkinData);
@@ -472,15 +487,17 @@ func handleTelemetryRequest(w http.ResponseWriter, req *http.Request) {
 }
 
 func handleSentryRequest(w http.ResponseWriter, req *http.Request) {
+	// send other telemetry to /dev/null ..
+
 	w.Header().Add("Content-Type", "application/json");
 	w.WriteHeader(200);
 
-	w.Write([]byte { '{', '}' });
+	w.Write([]byte("{}"));
 }
 
 func logRequestHandler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("> %s %s\n", r.Method,  r.URL);
+		fmt.Printf("[Server] [%s] %s\n", r.Method,  r.URL);
 		h.ServeHTTP(w, r)
 	})
 }
@@ -535,11 +552,11 @@ func runServer() {
 	var handler  http.Handler = mux;
 	handler = logRequestHandler(handler);
 
-	err := http.ListenAndServe(SERVER_URI, handler);
+	err := http.ListenAndServe(getServerHostPort(), handler);
 	if err != nil {
-		fmt.Printf("error starting server: %s is the server already running?\n", err);
+		fmt.Printf("[Server] error starting server: %s is the server already running?\n", err);
 	} else {
-		fmt.Printf("Starting server on $s\n", SERVER_URI);
+		fmt.Printf("[Server] Starting server on $s\n", getServerHostPort());
 	}
 }
 
@@ -566,7 +583,7 @@ func generateSessionJwt(scope []string) string {
 	sesTok := sessionToken {
 		Exp: int(time.Now().Add(time.Hour*200).Unix()),
 		Iat: int(time.Now().Unix()),
-		Iss: SERVER_PROTOCOL + SERVER_URI,
+		Iss: getServerUrl(),
 		Jti: uuid.NewString(),
 		Scope: strings.Join(scope, " "),
 		Sub: getUUID(),
@@ -581,7 +598,7 @@ func generateIdentityJwt(scope []string) string {
 	idTok := identityToken {
 		Exp: int(time.Now().Add(time.Hour*200).Unix()),
 		Iat: int(time.Now().Unix()),
-		Iss: SERVER_PROTOCOL + SERVER_URI,
+		Iss: getServerUrl(),
 		Jti: uuid.NewString(),
 		Scope: strings.Join(scope, " "),
 		Sub: getUUID(),

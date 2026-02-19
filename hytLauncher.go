@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -70,16 +71,56 @@ func urlToPath(targetUrl string) string {
 	return npath;
 }
 
-func download(targetUrl string, saveFilename string, onProgress func(done int64, total int64)) error {
-	fmt.Printf("Downloading %s\n", targetUrl);
+func copyFile(sourcePath string, saveFilename string, onProgress func(done int64, total int64)) error {
+	fmt.Printf("[Launcher] Copying %s to %s\n", sourcePath, saveFilename);
+	os.MkdirAll(filepath.Dir(saveFilename), 0775);
+
+	srcfd, err := os.OpenFile(sourcePath, os.O_RDONLY, 0777);
+	if err != nil {
+		return err;
+	}
+	defer srcfd.Close();
+
+	dstfd, err := os.Create(saveFilename);
+	if err != nil {
+		return err;
+	}
+	defer dstfd.Close();
+
+	stat, err := srcfd.Stat()
+	if err != nil {
+		return err;
+	}
+
+	total := stat.Size()
+	done := int64(0);
+	buffer := make([]byte, 0x8000);
+
+	for done < total {
+		rd, err := srcfd.Read(buffer);
+		if err != nil {
+			return err;
+		}
+		done += int64(rd);
+		dstfd.Write(buffer[:rd]);
+		onProgress(done, total);
+	}
+
+	return nil;
+}
+
+func downloadFile(sourceUrl string, saveFilename string, onProgress func(done int64, total int64)) error {
+	fmt.Printf("[Launcher] Downloading %s\n", saveFilename);
 
 	os.MkdirAll(filepath.Dir(saveFilename), 0775);
-	resp, err := http.Get(targetUrl);
+	req, err := createRequest("GET", sourceUrl, nil);
+	resp, err := http.DefaultClient.Do(req);
+
 	if err != nil {
 		return err;
 	}
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("%s got non-200 status: %d", targetUrl, resp.StatusCode);
+		return fmt.Errorf("%s got non-200 status: %s", sourceUrl, resp.Status);
 	}
 
 	f, err := os.Create(saveFilename);
@@ -103,6 +144,102 @@ func download(targetUrl string, saveFilename string, onProgress func(done int64,
 	}
 
 	return nil;
+}
+
+func checkFileExistsOnWebOrLocalStore(downloadUrl string) bool {
+	urlParsed, err := url.Parse(downloadUrl);
+	if err != nil {
+		return false;
+	}
+
+	_, err = os.Stat(filepath.Join(LocalStoreFolder(), urlParsed.Path));
+	if err != nil {
+		req, err := createRequest("HEAD", downloadUrl, nil);
+		resp, err := http.DefaultClient.Do(req);
+		if err != nil {
+			return false;
+		}
+
+		switch(resp.StatusCode) {
+			case 200:
+				return true;
+			case 404:
+				return false;
+			case 403:
+				return false;
+			default:
+				return false;
+		}
+	} else {
+		return true;
+	}
+}
+
+
+func downloadOrCopyFromLocalStore(targetUrl string, saveFilename string, onProgress func(done int64, total int64)) error{
+	parsedUrl, err := url.Parse(targetUrl);
+	if err != nil {
+		return err;
+	}
+
+	localStorePath := filepath.Join(LocalStoreFolder(), parsedUrl.Path);
+
+	_, err = os.Stat(localStorePath);
+	if err != nil {
+		return downloadFile(targetUrl, saveFilename, onProgress);
+	} else {
+		return copyFile(localStorePath, saveFilename, onProgress);
+	}
+}
+
+func checkVerExist(startVersion int, endVersion int, architecture string, operatingSystem string, channel string) bool {
+	uri := guessPatchUrlNoAuth(architecture, operatingSystem, channel, startVersion, endVersion);
+	return checkFileExistsOnWebOrLocalStore(uri);
+}
+
+
+func findLatestVersionNoAuth(current int, architecture string, operatingSystem string, channel string) int {
+
+	// obtaining the latest version from hytale CDN (as well as its 'pretty' name)
+	// requires authentication to hytale servers,
+	// however downloading versions does not,
+	// this is an optimized search alogirithm to find the latest version
+	//
+	// it makes a few assumptions; mainly-
+	// - there are never gaps in version numbers
+	// - the url scheme of version downloads is .. os/arch/channel/startver/destver.pwr
+	// if hytale ever changes how they handle this, then everything will break.
+
+
+	if current <= 0 {
+		current = 1;
+	}
+
+	lastVersion := current;
+	curVersion := current;
+
+	// check if has been updates since this; no point if no new versions are added
+	if checkVerExist(0, current+1, architecture, operatingSystem, channel) {
+
+		// multiply version number by 2 until a version is not found ..
+		for checkVerExist(0, curVersion, architecture, operatingSystem, channel) {
+			lastVersion = curVersion;
+			curVersion *= 2;
+		}
+
+		// binary search from last valid, to largest invalid;
+		for lastVersion+1 < curVersion {
+			middle := (curVersion + lastVersion) /2;
+			if checkVerExist(0, middle, architecture, operatingSystem,channel) {
+				lastVersion = middle;
+			} else {
+				curVersion = middle;
+			}
+		}
+	}
+
+
+	return lastVersion;
 }
 
 func getVersionDownloadsFolder() string {
@@ -142,7 +279,7 @@ func getJreDownloadPath(operatingSystem string) string {
 
 
 func downloadLatestVersion(atokens accessTokens, architecture string, operatingSystem string, channel string, fromVersion int, onProgress func(done int64, total int64)) error {
-	fmt.Printf("Start version: %d\n", fromVersion);
+	fmt.Printf("[Launcher] Start version: %d\n", fromVersion);
 	manifest, err := getVersionManifest(atokens, architecture, operatingSystem, channel, fromVersion);
 
 	if(err != nil) {
@@ -151,7 +288,7 @@ func downloadLatestVersion(atokens accessTokens, architecture string, operatingS
 
 	for _, step := range manifest.Steps {
 		save := getVersionDownloadPath(step.From, step.To, channel);
-		return download(step.Pwr, save, onProgress);
+		return downloadOrCopyFromLocalStore(step.Pwr, save, onProgress);
 	}
 	return errors.New("Could not locate latest version");
 }
@@ -214,7 +351,7 @@ func installJreEx(operatingSystem string, out string, temp string, onProgress fu
 
 	}
 
-	err = download(downloadUrl, temp, onProgress);
+	err = downloadOrCopyFromLocalStore(downloadUrl, temp, onProgress);
 	defer os.Remove(temp);
 	defer os.RemoveAll(filepath.Dir(temp));
 
@@ -349,7 +486,7 @@ func installGameEx(startVersion int, endVersion int, channel string, operatingSy
 
 	sigPath := temp + ".sig";
 
-	err := download(downloadUrl, temp, onProgress);
+	err := downloadOrCopyFromLocalStore(downloadUrl, temp, onProgress);
 	defer os.Remove(temp);
 	defer os.Remove(sigPath);
 	defer os.RemoveAll(getVersionDownloadsFolder());
@@ -358,7 +495,7 @@ func installGameEx(startVersion int, endVersion int, channel string, operatingSy
 		return err;
 	}
 
-	err = download(downloadSig, sigPath, onProgress);
+	err = downloadOrCopyFromLocalStore(downloadSig, sigPath, onProgress);
 	defer os.Remove(sigPath);
 
 	if err != nil {
@@ -366,7 +503,7 @@ func installGameEx(startVersion int, endVersion int, channel string, operatingSy
 	}
 	os.MkdirAll(out, 0775);
 
-	fmt.Printf("Applying patch %s, using source: %s to: %s\n", temp, src, out);
+	fmt.Printf("[Launcher] Applying patch %s, using source: %s to: %s\n", temp, src, out);
 	err = applyPatch(src, out, temp, sigPath, onProgress);
 	if err != nil {
 		return err;
@@ -561,7 +698,7 @@ func launchGame(version int, channel string, username string, uuid string) error
 			generateSessionJwt([]string{"hytale:client"}));
 
 
-		fmt.Printf("Running: %s\n", strings.Join(e.Args, " "))
+		fmt.Printf("[Launcher] Running: %s\n", strings.Join(e.Args, " "))
 
 		writeAurora(dllName, embedName);
 
@@ -574,12 +711,12 @@ func launchGame(version int, channel string, username string, uuid string) error
 		e.Env = append(e.Env, "AURORA_ENABLE_INSECURE_SERVERS=true");
 		e.Env = append(e.Env, "AURORA_ENABLE_AUTH_SWAP=true");
 		e.Env = append(e.Env, "AURORA_ENABLE_SINGLEPLAYER_AS_INSECURE=true");
-		e.Env = append(e.Env, "AURORA_SESSIONS=http://"+SERVER_URI[:7]);
-		e.Env = append(e.Env, "AURORA_ACCOUNT_DATA=http://"+SERVER_URI[:7]);
-		e.Env = append(e.Env, "AURORA_TOOLS=http://"+SERVER_URI[:7]);
-		e.Env = append(e.Env, "AURORA_TELEMETRY=http://"+SERVER_URI[:7]);
-		e.Env = append(e.Env, "AURORA_HYTALE_COM="+SERVER_URI[7:]);
-		e.Env = append(e.Env, "AURORA_SENTRY_URL=http://transrights@"+SERVER_URI+"/2");
+		e.Env = append(e.Env, "AURORA_SESSIONS="+getServerUrl()[:14]);
+		e.Env = append(e.Env, "AURORA_ACCOUNT_DATA="+getServerUrl()[:14]);
+		e.Env = append(e.Env, "AURORA_TOOLS="+getServerUrl()[:14]);
+		e.Env = append(e.Env, "AURORA_TELEMETRY="+getServerUrl()[:14]);
+		e.Env = append(e.Env, "AURORA_HYTALE_COM="+getServerUrl()[14:]);
+		e.Env = append(e.Env, "AURORA_SENTRY_URL="+getSentryUrl());
 
 		err := run(e);
 
@@ -625,7 +762,7 @@ func launchGame(version int, channel string, username string, uuid string) error
 			"--session-token",
 			newSess.SessionToken);
 
-		fmt.Printf("Running: %s\n", strings.Join(e.Args, " "))
+		fmt.Printf("[Launcher] Running: %s\n", strings.Join(e.Args, " "))
 
 		if wCommune.AuroraEverywhere {
 			err := writeAurora(dllName, embedName);
@@ -667,7 +804,7 @@ func launchGame(version int, channel string, username string, uuid string) error
 			"--name",
 			username);
 
-		fmt.Printf("Running: %s %s\n", clientBinary, strings.Join(e.Args, " "))
+		fmt.Printf("[Launcher] Running: %s %s\n", clientBinary, strings.Join(e.Args, " "))
 
 		err := run(e);
 
@@ -686,3 +823,183 @@ func launchGame(version int, channel string, username string, uuid string) error
 
 	return nil;
 }
+
+
+
+func writeSettings() {
+	jlauncher, _ := json.Marshal(wCommune);
+
+	err := os.MkdirAll(filepath.Dir(LauncherJson()), 0666);
+	if err != nil {
+		fmt.Printf("[Launcher] error writing settings: %s\n", err);
+		return;
+	}
+
+	err = os.WriteFile(LauncherJson(), jlauncher, 0666);
+	if err != nil {
+		fmt.Printf("[Launcher] error writing settings: %s\n", err);
+		return;
+	}
+
+	fmt.Printf("[Launcher] Writing settings successfully.\n");
+}
+
+
+func readSettings() {
+	_, err := os.Stat(LauncherJson())
+	if err != nil {
+		getDefaultSettings();
+	} else {
+		data, err := os.ReadFile(LauncherJson());
+		if err != nil{
+			getDefaultSettings();
+			return;
+		}
+		json.Unmarshal(data, &wCommune);
+
+		if wCommune.GameFolder != GameFolder() {
+			wCommune.GameFolder = GameFolder();
+		}
+	}
+	fmt.Printf("[Launcher] Reading settings successfully.\n")
+}
+
+func getDefaultSettings() {
+	writeSettings();
+	go checkForGameUpdates();
+
+}
+
+func cacheVersionList(channel string) {
+	latest := wCommune.LatestVersions[channel];
+
+	for i := range latest {
+		wInstalledVersions[channel][i+1] = isGameVersionInstalled(i+1, channel)
+	}
+}
+
+func findInstalledVersionList(channel string) {
+	entries, err := os.ReadDir(getVersionsFolder(channel));
+	if err != nil {
+		return;
+	}
+
+	for _, e := range entries {
+		if e.IsDir() {
+			versionNumber, err := strconv.Atoi(filepath.Base(e.Name()));
+			if err != nil {
+				return;
+			}
+
+			if isGameVersionInstalled(versionNumber, channel) {
+				wInstalledVersions[channel][versionNumber] = true;
+				if versionNumber > wCommune.LatestVersions[channel] {
+					wCommune.LatestVersions[channel] = versionNumber;
+				}
+			}
+		}
+	}
+}
+
+func findAllInstalledVersions() {
+	findInstalledVersionList("release");
+	findInstalledVersionList("pre-release");
+}
+
+func cacheAllVersions() {
+	findAllInstalledVersions();
+	cacheVersionList("release");
+	cacheVersionList("pre-release");
+}
+
+
+
+func updateSelectedVerison() {
+
+	prevLatest := 1;
+
+	if wCommune.Patchline == E_PATCH_PRE_RELEASE {
+		prevLatest = int(wCommune.LatestVersions["pre-release"])-1;
+	} else {
+		prevLatest = int(wCommune.LatestVersions["release"])-1;
+	}
+
+	if wCommune.SelectedVersion < 0 || int(wCommune.SelectedVersion) >= prevLatest {
+		wCommune.SelectedVersion = int32(prevLatest);
+	}
+}
+
+func authenticatedCheckForUpdatesAndGetProfileList() {
+	if wCommune.AuthTokens == nil {
+		return;
+	}
+	if(wCommune.Mode != E_MODE_AUTHENTICATED) {
+		return;
+	}
+
+	lData, err := getVersionInformation(*wCommune.AuthTokens, runtime.GOARCH, runtime.GOOS);
+
+	if err != nil {
+		showErrorDialog(fmt.Sprintf("Failed to get launcher data: %s", err), "Auth failed.");
+		wCommune.AuthTokens = nil;
+		wCommune.Mode = E_MODE_FAKEONLINE;
+		writeSettings();
+	}
+
+	lastReleaseVersion := wCommune.LatestVersions["release"];
+	latestReleaseVersion := lData.Patchlines.Release.Newest;
+
+	lastPreReleaseVersion := wCommune.LatestVersions["pre-release"];
+	latestPreReleaseVersion := lData.Patchlines.PreRelease.Newest;
+
+	if latestReleaseVersion > lastReleaseVersion {
+		fmt.Printf("[Launcher] [AUTH] found new release: %d\n", lastReleaseVersion)
+		wCommune.LatestVersions["release"] = latestReleaseVersion;
+	}
+	if latestPreReleaseVersion > lastPreReleaseVersion {
+		fmt.Printf("[Launcher] [AUTH] found new release: %d\n", lastPreReleaseVersion)
+		wCommune.LatestVersions["pre-release"] = latestPreReleaseVersion;
+	}
+
+	wCommune.Profiles = &lData.Profiles;
+	updateSelectedVerison();
+
+	writeSettings();
+	cacheAllVersions();
+
+}
+
+
+func checkForGameUpdates() {
+	if !wGotLatestLauncherVersion {
+		wCommune.SpoofLauncherVersion = getLatestLauncherVersion();
+	}
+
+	if wCommune.Mode != E_MODE_AUTHENTICATED {
+		lastRelease := wCommune.LatestVersions["release"]
+		lastPreRelease := wCommune.LatestVersions["pre-release"]
+
+		latestRelease := findLatestVersionNoAuth(lastRelease, runtime.GOARCH, runtime.GOOS, "release");
+		latestPreRelease := findLatestVersionNoAuth(lastPreRelease, runtime.GOARCH, runtime.GOOS, "pre-release");
+
+		if latestRelease > lastRelease {
+			fmt.Printf("[Launcher] Found new release version: %d\n", latestRelease);
+			wCommune.LatestVersions["release"] = latestRelease;
+		}
+
+		if latestPreRelease > lastPreRelease {
+			fmt.Printf("[Launcher] Found new pre-release version: %d\n", latestPreRelease);
+			wCommune.LatestVersions["pre-release"] = latestPreRelease;
+		}
+
+		updateSelectedVerison();
+
+	} else {
+		authenticatedCheckForUpdatesAndGetProfileList();
+	}
+
+	writeSettings();
+	cacheAllVersions();
+
+}
+

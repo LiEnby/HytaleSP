@@ -1,13 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"image"
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"time"
@@ -34,9 +32,11 @@ type launcherCommune struct {
 	GameFolder string `json:"install_directory"`
 	UserDataFolder string `json:"userdata_directory"`
 	JreFolder string `json:"jre_directory"`
+	LocalStoreFolder string `json:"local_store_directory"`
 
 	AutoUpdates bool `json:"automatic_updates"`
 	FormatVersion int `json:"fmt_version"`
+	SpoofLauncherVersion string `json:"spoof_launcher_version"`
 
 	// Debug Settings
 	UUID string `json:"uuid_override"`
@@ -62,8 +62,8 @@ var (
 		Patchline: DEFAULT_PATCHLINE,
 		Username: DEFAULT_USERNAME,
 		LatestVersions: map[string]int{
-			"release": 7,
-			"pre-release": 17,
+			"release": 0,
+			"pre-release": 0,
 		},
 		SelectedVersion: -1,
 		Mode: E_MODE_FAKEONLINE,
@@ -75,6 +75,8 @@ var (
 		GameFolder: DefaultGameFolder(),
 		UserDataFolder: DefaultUserDataFolder(),
 		JreFolder: DefaultJreFolder(),
+		LocalStoreFolder: DefaultLocalStoreFolder(),
+		SpoofLauncherVersion: "2026.02.12-54e579b",
 		FormatVersion: 0,
 
 		MaxSkins: 5,
@@ -83,6 +85,7 @@ var (
 		AuroraEverywhere: true,
 	};
 	wProgress float32 = 0.0
+	wGotLatestLauncherVersion = false
 	wDisabled = false
 	wSelectedTab = 0
 	wGameRunning = false
@@ -94,24 +97,6 @@ var (
 	wVersion = "no-version";
 )
 
-
-
-func cacheVersionList() {
-
-	channel := "release"
-	latest := wCommune.LatestVersions[channel];
-
-	for i := range latest {
-		wInstalledVersions[channel][i+1] = isGameVersionInstalled(i+1, channel)
-	}
-
-	channel = "pre-release"
-	latest = wCommune.LatestVersions[channel];
-
-	for i := range latest {
-		wInstalledVersions[channel][i+1] = isGameVersionInstalled(i+1, channel)
-	}
-}
 
 func getWindowWidth() float32 {
 	vec2 := imgui.ContentRegionAvail();
@@ -136,32 +121,6 @@ func doAuthentication() {
 
 }
 
-
-func checkForGameUpdatess() {
-	if wCommune.Mode != E_MODE_AUTHENTICATED {
-		lastRelease := wCommune.LatestVersions["release"]
-		lastPreRelease := wCommune.LatestVersions["pre-release"]
-
-		latestRelease := findLatestVersionNoAuth(lastRelease, runtime.GOARCH, runtime.GOOS, "release");
-		latestPreRelease := findLatestVersionNoAuth(lastPreRelease, runtime.GOARCH, runtime.GOOS, "pre-release");
-
-		if latestRelease > lastRelease {
-			fmt.Printf("Found new release version: %d\n", latestRelease);
-			wCommune.LatestVersions["release"] = latestRelease;
-		}
-
-		if latestPreRelease > lastPreRelease {
-			fmt.Printf("Found new pre-release version: %d\n", latestPreRelease);
-			wCommune.LatestVersions["pre-release"] = latestPreRelease;
-		}
-
-		updateSelectedVerison();
-
-		writeSettings();
-		cacheVersionList()
-
-	}
-}
 
 func checkForLauncherUpdates() {
 	// cleanup .old file
@@ -238,62 +197,7 @@ func checkForLauncherUpdates() {
 }
 
 
-func updateSelectedVerison() {
-
-	latestVersion := 1;
-
-	if wCommune.Patchline == E_PATCH_PRE_RELEASE {
-		latestVersion = int(wCommune.LatestVersions["pre-release"])-1;
-	} else {
-		latestVersion = int(wCommune.LatestVersions["release"])-1;
-	}
-
-	if wCommune.SelectedVersion < 0 || int(wCommune.SelectedVersion) > latestVersion {
-		wCommune.SelectedVersion = int32(latestVersion);
-	}
-}
-
-func authenticatedCheckForUpdatesAndGetProfileList() {
-	if wCommune.AuthTokens == nil {
-		return;
-	}
-	if(wCommune.Mode != E_MODE_AUTHENTICATED) {
-		return;
-	}
-
-	lData, err := getLauncherData(*wCommune.AuthTokens, runtime.GOARCH, runtime.GOOS);
-
-	if err != nil {
-		showErrorDialog(fmt.Sprintf("Failed to get launcher data: %s", err), "Auth failed.");
-		wCommune.AuthTokens = nil;
-		wCommune.Mode = E_MODE_FAKEONLINE;
-		writeSettings();
-	}
-
-	lastReleaseVersion := wCommune.LatestVersions["release"];
-	latestReleaseVersion := lData.Patchlines.Release.Newest;
-
-	lastPreReleaseVersion := wCommune.LatestVersions["pre-release"];
-	latestPreReleaseVersion := lData.Patchlines.PreRelease.Newest;
-
-	if latestReleaseVersion > lastReleaseVersion {
-		fmt.Printf("found new release: %d\n", lastReleaseVersion)
-		wCommune.LatestVersions["release"] = latestReleaseVersion;
-	}
-	if latestPreReleaseVersion > lastPreReleaseVersion {
-		fmt.Printf("found new release: %d\n", lastPreReleaseVersion)
-		wCommune.LatestVersions["pre-release"] = latestPreReleaseVersion;
-	}
-
-	wCommune.Profiles = &lData.Profiles;
-	updateSelectedVerison();
-
-	writeSettings();
-	cacheVersionList();
-
-}
-
-func reAuthenticate() {
+func refreshAuthentication() {
 	if wCommune.AuthTokens != nil && wCommune.Mode == E_MODE_AUTHENTICATED {
 		_, session, err := unmakeJwt(wCommune.AuthTokens.AccessToken);
 		if err != nil {
@@ -320,51 +224,6 @@ func reAuthenticate() {
 		}
 
 		authenticatedCheckForUpdatesAndGetProfileList();
-	}
-}
-
-func writeSettings() {
-	jlauncher, _ := json.Marshal(wCommune);
-
-	err := os.MkdirAll(filepath.Dir(getLauncherJson()), 0666);
-	if err != nil {
-		fmt.Printf("error writing settings: %s\n", err);
-		return;
-	}
-
-	err = os.WriteFile(getLauncherJson(), jlauncher, 0666);
-	if err != nil {
-		fmt.Printf("error writing settings: %s\n", err);
-		return;
-	}
-}
-
-func getDefaultSettings() {
-	writeSettings();
-	go checkForGameUpdatess();
-
-}
-
-func getLauncherJson() string {
-	return filepath.Join(LauncherFolder(), "launcher.json");
-}
-
-func readSettings() {
-	_, err := os.Stat(getLauncherJson())
-	if err != nil {
-		getDefaultSettings();
-	} else {
-		data, err := os.ReadFile(getLauncherJson());
-		if err != nil{
-			getDefaultSettings();
-			return;
-		}
-		json.Unmarshal(data, &wCommune);
-
-		if wCommune.GameFolder != GameFolder() {
-			wCommune.GameFolder = GameFolder();
-		}
-
 	}
 }
 
@@ -447,9 +306,18 @@ func patchLineMenu() giu.Widget {
 
 
 func versionMenu() giu.Widget {
-	versions := []string {};
 	selectedChannel := valToChannel(int(wCommune.Patchline));
-	selectedVersion := int(wCommune.SelectedVersion+1);
+	versions := []string {};
+	/* for key := range wInstalledVersions[selectedChannel] {
+		text := "Version " + strconv.Itoa(key);
+		if wInstalledVersions[selectedChannel][key] {
+			text += " - installed";
+		} else {
+			text += " - not installed";
+		}
+		versions = append(versions, text);
+	} */
+
 
 	latest := wCommune.LatestVersions[selectedChannel];
 	for i := range latest {
@@ -461,22 +329,30 @@ func versionMenu() giu.Widget {
 		}
 		versions = append(versions, txt);
 	}
-	buttondisabled := !wInstalledVersions[selectedChannel][selectedVersion] || wDisabled;
+
 
 	bSize := getButtonSize("Delete")
 	padX, _ := giu.GetWindowPadding();
 
-	showVersion := int(wCommune.SelectedVersion);
-	if showVersion < 0{
-		showVersion = 0;
-	} else if showVersion > len(versions) {
-		showVersion = len(versions)-1;
+	versionIndex := int(wCommune.SelectedVersion);
+	if versionIndex < 0 {
+		versionIndex = 0;
+	} else if versionIndex >= len(versions) {
+		versionIndex = len(versions)-1;
 	}
+
+	currentVersion := "No Versions Found.";
+	if len(versions) > 0 {
+		currentVersion = versions[versionIndex];
+	}
+
+	selectedVersion := versionIndex + 1;
+	buttondisabled := !wInstalledVersions[selectedChannel][selectedVersion] || wDisabled;
 
 	return giu.Layout{
 		giu.Label("Version: "),
 		giu.Row(
-			giu.Combo("##version", versions[showVersion], versions, &wCommune.SelectedVersion).Size(getWindowWidth() - (bSize + padX)),
+			giu.Combo("##version", currentVersion, versions, &wCommune.SelectedVersion).Size(getWindowWidth() - (bSize + padX)),
 			giu.Button("Delete").Disabled(buttondisabled).OnClick(func() {
 				wDisabled = true;
 
@@ -565,7 +441,7 @@ func modeSelector () giu.Widget {
 		giu.Label("Launch Mode: "),
 		giu.Combo("##launchMode", modes[wCommune.Mode], modes, &wCommune.Mode).Size(getWindowWidth()).OnChange(func() {
 			if wCommune.Mode == E_MODE_AUTHENTICATED {
-				go reAuthenticate();
+				go refreshAuthentication();
 			}
 		}),
 	};
@@ -689,7 +565,7 @@ func drawSettings() giu.Widget{
 
 	return giu.Style().SetDisabled(wDisabled).To(
 		drawSeperator("Directories"),
-		giu.Tooltip("The location that the game files are stored\n(they will be downloaded here, if it's not found)").To(browseButton("Game Location", &wCommune.GameFolder, cacheVersionList)),
+		giu.Tooltip("The location that the game files are stored\n(they will be downloaded here, if it's not found)").To(browseButton("Game Location", &wCommune.GameFolder, cacheAllVersions)),
 		giu.Tooltip("The location of the Java Runtime Environment that the game's server uses\n(it will be downloaded here, if it's not found)").To(browseButton("JRE Location", &wCommune.JreFolder, nil)),
 		giu.Tooltip("The location that the games savedata will be stored,\n(worlds, mods, server list, log files, etc)").To(browseButton("User Data Location", &wCommune.UserDataFolder, nil)),
 		drawSeperator("Launcher"),
@@ -812,9 +688,8 @@ func main() {
 	os.MkdirAll(JreFolder(), 0775);
 	os.MkdirAll(GameFolder(), 0775);
 
-	cacheVersionList();
-	go reAuthenticate();
-	go checkForGameUpdatess();
+	go refreshAuthentication();
+	go checkForGameUpdates();
 
 	dataFixerUpper(wCommune.FormatVersion);
 

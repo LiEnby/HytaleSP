@@ -82,6 +82,18 @@ func DefaultJreFolder() string {
 	return filepath.Join(MainFolder(), "jre");
 }
 
+func DefaultLocalStoreFolder() string {
+	return filepath.Join(MainFolder(), "localStore");
+}
+
+
+func LocalStoreFolder() string {
+	if strings.Trim(wCommune.LocalStoreFolder, " ") == "" {
+		return DefaultLocalStoreFolder();
+	}
+
+	return wCommune.LocalStoreFolder;
+}
 
 func GameFolder() string {
 	if strings.Trim(wCommune.GameFolder, " ") == "" {
@@ -113,4 +125,9 @@ func LauncherFolder() string {
 
 func ServerDataFolder() string {
 	return filepath.Join(MainFolder(), "serverdata");
+}
+
+
+func LauncherJson() string {
+	return filepath.Join(LauncherFolder(), "launcher.json");
 }

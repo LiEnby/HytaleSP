@@ -419,8 +419,8 @@ func handleCli(argv []string) int{
 
 
 	loadDefaults();
-	reAuthenticate();
-	checkForGameUpdatess();
+	refreshAuthentication();
+	checkForGameUpdates();
 
 	os.MkdirAll(UserDataFolder(), 0775);
 	os.MkdirAll(JreFolder(), 0775);
